@@ -25,7 +25,6 @@ parametri opzionali:
 Avvio Server
 
 all'avvio chiede da terminale di inserire una master key (passphrase)
-
 	con la passphrase si genererà il token T_s
 
 Al termine del processo di generazione del token il buffer utilizzato per leggere la passphrase deve essere azzerato.
@@ -112,51 +111,108 @@ Stauts Code server
 	: indica che l'operazione ha prodotto un errore. Ad esempio il path non esiste, oppure il comando non esiste.
 
 ---------------------------------------------------------------------
-Autenticazione
-
-
+Risposte comandi
 
 Il server in risposta al comando HELO:
 	invia il codice 300, a seguire un unsigned long int che rappresenta la challenge di autenticazione, come descritta in seguito nel protocollo di autenticazione.
 
----------------------------------------------------------------------
-Risposta comandi
 
 In riposta al comando SIZE 
 	invia il codice 300 a seguire un unsigned long int che rappresenta la size in byte del file richiesto.
 
 
 In risposta al comando LSF
-	il server invia il codice 300, a seguire, la lista dei file come una serie di record testuali (un record per ogni file) aventi la seguente struttura: "dimensione (in byte)" "path del file". 
-	I record di aggiornamento sono separati tra di loro dalla sequenza "\r\n"  e la file della lista è indicata dalla sequenza " \r\n.\r\n".
-
-In risposta al comando EXEC, il server invia il codice 300 e, a seguire, lo stdout se il programma ha terminato correttamente oppure il valore di ritorno nel caso ci sia stato un errore. Il server invia il contenuto dello stdout una linea alla volta e alla fine conclude con la sequenza " \r\n.\r\n"; nel caso in cui il server invii il valore di ritorno lo invia su una linea, terminata con la sequenza " \r\n.\r\n".
-
-Il server deve supportare almeno i seguenti comandi tramite la richiesta EXEC :
-
-copy <src> [<src>...] <dst>: copia src in dst. Se ci sono più src, dst deve essere una directory
-
-remove <file> [<file>...] : rimuove il/i file che sono passati come argomenti
-
-whoami: stampa utente
-
-printworkdir: ritorna la working directory
-
-sort <file>: stampa il contenuto di file ordinato lessicograficamente
+	il server invia il codice 300, a seguire, la lista dei file come una serie di record testuali (un record per ogni file) aventi la seguente struttura: 
+		<size in byte> <path>\r\n
+		...
+		 \r\n.\r\n		(spazio vuoto all'inizio della riga)
 
 
+In risposta al comando EXEC
+	il server invia il codice 300, a seguire: 
+		lo stdout se il programma ha terminato correttamente 
+		oppure 
+		il valore di ritorno nel caso ci sia stato un errore. 
+		
+		Il server invia il contenuto dello stdout una linea alla volta e alla fine conclude con la sequenza " \r\n.\r\n"; nel caso in cui il server invii il valore di ritorno lo invia su una linea, terminata con la sequenza " \r\n.\r\n" (spazio vuoto all'inizio della riga)
 
-Il protocollo di autenticazione prevede la definizione della funzione unsigned long int generateToken(const char *passphrase), in grado di generare un token a partire da una passphrase di lunghezza variabile; è richiesto che, data la stessa passphrase in  input venga generato lo stesso output.  Il protocollo di autenticazione prevede i seguenti passi:
+		Il server deve supportare i seguenti comandi tramite la richiesta EXEC:
 
-Il server chiama la funzione generateToken per calcolare, a partire dalla server-passphrase, il token T_s che identifica il server;
+		copy <src> [<src>...] <dst>
+		: copia src in dst. 
+		: Se ci sono più src, dst deve essere una directory
 
-Ogni client utilizza la funzione generateToken per calcolare il token T_s utilizzando la server-passphrase ed un token T_c_i a partire dalla client_i-passphrase.
+		remove <file> [<file>...]
+		: rimuove il/i file che sono passati come argomenti
 
-Il client  invia un messaggio di HELO a cui il server risponde con un codice di risposta 300 ed invia poi un unsigned long int che contiene la challenge.  Il valore che viene inviato dal server è calcolato effettuando lo XOR del token T_s e della challenge, un unsigned long int scelto dal server in maniera random.
+		whoami
+		: stampa (il nome) utente
 
-Il client estrae la challenge, utilizzando il valore di T_s  che ha calcolato al passo 2. Invia poi al server un messaggio AUTH <enc1;enc2> dove enc1_c=(T_s 	XOR T_c_i ) e enc2_c=(T_c_i XOR challenge).
+		printworkdir
+		: ritorna la working directory (CWD)
 
-Il server estrae da enc1 la chiave T_c_i e la utilizza per verificare da enc2 la challenge; se il valore è corretto risponde con un codice 200 altrimenti con un codice 400 e chiude la comunicazione.
+		sort <file>
+		: stampa il contenuto di file ordinato lessicograficamente
+
+---------------------------------------------------------------------
+Autenticazione
+
+definizione della funzione:
+	unsigned long int generateToken(const char *passphrase)
+	: passphrase di lunghezza variabile
+	: funzione hash, stesso input stesso output
+
+
+IN PRIMIS
+
+
+Il server chiama la funzione generateToken per calcolare, 
+	a partire dalla server-passphrase il token T_s che identifica il server
+	
+	passphrase -> generateToken() -> T_s (unsigned long int)
+
+
+
+
+??????????????????????????????
+i client usano la funzione generateToken per calcolare il token T_s usnado:
+	: server-passphrase 
+	: T_c_i (a partire dalla client_i-passphrase)
+	
+	client_i-passphrase -> generateToken() -> T_c_i (unsigned long int)
+	
+	server-passphrase + T_c_i = T_s
+??????????????????????????????
+
+
+
+
+Il protocollo di autenticazione prevede i seguenti passi:
+
+Il client  invia un messaggio di HELO
+
+il server risponde con un codice di risposta 300
+	invia poi un unsigned long int che contiene la challenge.
+	Il valore che viene inviato dal server è calcolato effettuando:
+		nonce = T_s XOR challenge
+			La challenge è un unsigned long int scelto random dal server (nonce)
+
+
+Il client estrae la challenge
+	utilizzando il valore di T_s che ha calcolato in primis 
+	Invia poi al server un messaggio AUTH <enc1;enc2> dove:
+	: enc1_c=(T_s 	XOR T_c_i ) 
+	: enc2_c=(T_c_i XOR challenge)
+
+Il server 
+	estrae da enc1 la chiave T_c_i ( enc1 XOR T_s )
+	usa T_c_i per verificare enc2 ed estrarre la challenge
+		se il valore è corretto risponde con un codice 200 
+		altrimenti 
+		con un codice 400 e chiude la comunicazione.
+
+---------------------------------------------------------------------
+
 
 I comandi del client sono specificati da linea comandi utilizzando le seguenti opzioni (o con equivalenti sottocomandi):
 
