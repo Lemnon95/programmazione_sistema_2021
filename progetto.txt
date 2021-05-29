@@ -22,7 +22,7 @@ parametri opzionali:
 
 
 ---------------------------------------------------------------------
-SERVER
+Avvio Server
 
 all'avvio chiede da terminale di inserire una master key (passphrase)
 
@@ -35,12 +35,14 @@ il server si mette in attesa di connessioni sulla porta TCP 8888
 	modificabile tramite file di configurazione (-c)
 
 ---------------------------------------------------------------------
+
 Il server crea inizialmente un pool di thread 
 	Il numero di thread è specificabile da linea comandi (opzione -n) o da file di configurazione. 
 
 Se nessun thread è disponibile per gestire una richiesta, la richiesta rimane in sospeso fino a quando un thread non è disponibile.
 
 ---------------------------------------------------------------------
+
 i thread devono loggare sul file (-l) le richieste dai client autenticati (le richieste dai client dopo che hanno ricevuto il codice 200 a seguito del comando AUTH); 
 
 utilizzare un meccanismo di lock, per il file log, a scelta tra quelli visti durante il corso (Nella relazione finale, motivare la scelta)
@@ -59,50 +61,74 @@ ip:port: indirizzo IP e porta del client
 
 command: il tipo di richiesta (LSF, EXEC, DOWNLOAD, SIZE, UPLOAD);
 
+---------------------------------------------------------------------
+in linux
+
+il server è in grado di rileggere il file di configurazione e, se necessario, modificare la porta TCP ed il numero massimo di thread. 
+	la rilettura è attivata quando il server riceve il segnale SIGHUP (kill -HUP <processID>)
+
+se non è specificato un file di configurazione, la ricezione del segnale SIGHUP non produrrà alcun effetto.
+
+---------------------------------------------------------------------
+
+protocollo di comunicazione tra client e server:
+
+	HELO 
+
+	AUTH <enc1;enc2>
+	: più avanti c'è l'algoritmo
+
+	LSF <path>
+	: richiede la lista di file e directory contenuti in path (non entra nelle eventuali sottocartelle).
+
+	EXEC <cmd num_args [args...] >
+	: esegue il comando specificato da cmd [args..]
+	: ritorna lo stdout del programma se questo termina correttamente (valore di ritorno = 0) 
+	: oppure il valore di ritorno nel caso ci sia stato un errore
+
+	DOWNLOAD <path;size>
+	: richiede che il server si prepari a ricevere un file di size byte e lo salvi sul path specificato.
+
+	SIZE <path>
+	: ritorna la dimensione in byte del file (unsigned long int) indicato da path. (É un comando ausiliario usato prima del comando UPLOAD per conoscere la dimensione in byte del file)
+
+	UPLOAD <path,size>
+	: richiede che il server invii i primi size byte del contenuto del file identificato da path.
+
+---------------------------------------------------------------------
+
+Stauts Code server
+
+	200
+	: indica che l'operazione è andata a buon fine. 
+
+	300
+	: indica che il server invierà ulteriore output. 
+	: Utilizzato per indicare l'invio della lista dei file come risposta dei comandi LSF e EXEC 
+	: per l’invio della challenge di autenticazione come risposta del comando HELO
+	: per l'invio della size del comando SIZE.
+
+	400
+	: indica che l'operazione ha prodotto un errore. Ad esempio il path non esiste, oppure il comando non esiste.
+
+---------------------------------------------------------------------
+Autenticazione
 
 
 
+Il server in risposta al comando HELO:
+	invia il codice 300, a seguire un unsigned long int che rappresenta la challenge di autenticazione, come descritta in seguito nel protocollo di autenticazione.
+
+---------------------------------------------------------------------
+Risposta comandi
+
+In riposta al comando SIZE 
+	invia il codice 300 a seguire un unsigned long int che rappresenta la size in byte del file richiesto.
 
 
-
-
-
-
-In ambiente Unix/Linux il server, mentre è in esecuzione, è in grado di rileggere il file di configurazione e, se necessario, modificare la porta TCP ed il numero massimo di thread. La rilettura è attivata quando il server riceve il  segnale SIGHUP. Qualora non venga fornito un file di configurazione all'avvio del server, la ricezione del segnale SIGHUP non produrrà alcun effetto.
-
-
-
-Il protocollo di comunicazione tra server e client supporta i seguenti comandi:
-
-HELO 
-
-AUTH: <enc1;enc2>: come calcolare enc1 ed enc2 è definito nella descrizione del protocollo di autenticazione.
-
-LSF <path>: richiede la lista di file e directory contenuti in path (non entra nelle eventuali sottocartelle).
-
-EXEC <cmd num_args [args...] >:  richiede che venga eseguito sul server il comando specificato da cmd [args..] e ritorna lo stdout del programma se questo termina correttamente (valore di ritorno = 0) oppure il valore di ritorno nel caso ci sia stato un errore. I comandi lanciati da EXEC non devono essere interattivi.
-
-DOWNLOAD <path;size>: richiede che il server si prepari a ricevere un file di size byte e lo salvi sul path specificato.
-
-SIZE <path>:  richiede la dimensione in byte del file indicato da path. É un comando ausiliario che va utilizzato prima del comando UPLOAD per conoscere la dimensione in byte del file.
-
-UPLOAD <path,size>: richiede che il server invii i primi size byte del contenuto del file identificato da path.
-
-Il server invia i seguenti codici di risposta al client
-
-200:  indica che l'operazione è andata a buon fine. 
-
-300:  indica che il server invierà ulteriore output. Utilizzato per indicare l'invio della lista dei file come risposta dei comandi LSF e EXEC(vedi seguito), per l’invio della challenge di autenticazione come risposta del comando HELO e per l'invio della size del comando SIZE.
-
-400:  indica che l'operazione ha prodotto un errore. Ad esempio il path non esiste, oppure il comando non esiste.
-
-
-
-Il server in risposta al comando HELO invia il codice 300 e a seguire un unsigned long int che rappresenta la challenge di autenticazione, come descritta in seguito nel protocollo di autenticazione.
-
-In riposta al comando SIZE invia il codice 300 e a seguire un unsigned long int che rappresenta la size in byte del file richiesto.
-
-In risposta al comando LSF, il server invia il codice 300 e, a seguire, la lista dei file come una  serie di record testuali (un record per ogni file) aventi la seguente struttura: "dimensione (in byte)" "path del file". I record di aggiornamento sono separati tra di loro dalla sequenza "\r\n"  e la file della lista è indicata dalla sequenza " \r\n.\r\n".
+In risposta al comando LSF
+	il server invia il codice 300, a seguire, la lista dei file come una serie di record testuali (un record per ogni file) aventi la seguente struttura: "dimensione (in byte)" "path del file". 
+	I record di aggiornamento sono separati tra di loro dalla sequenza "\r\n"  e la file della lista è indicata dalla sequenza " \r\n.\r\n".
 
 In risposta al comando EXEC, il server invia il codice 300 e, a seguire, lo stdout se il programma ha terminato correttamente oppure il valore di ritorno nel caso ci sia stato un errore. Il server invia il contenuto dello stdout una linea alla volta e alla fine conclude con la sequenza " \r\n.\r\n"; nel caso in cui il server invii il valore di ritorno lo invia su una linea, terminata con la sequenza " \r\n.\r\n".
 
