@@ -172,62 +172,92 @@ Il server chiama la funzione generateToken per calcolare,
 	passphrase -> generateToken() -> T_s (unsigned long int)
 
 
+ogni client richede l'inserimento di due passphrase
+	: quella utilizzata all'avvio del server server-passphrase (T_s)
+	: una specifica per ogni client, client-passphrase. 
+
+Queste passphrase saranno utilizzate per la procedura di autenticazione.
 
 
-??????????????????????????????
 i client usano la funzione generateToken per calcolare il token T_s usnado:
 	: server-passphrase 
 	: T_c_i (a partire dalla client_i-passphrase)
 	
 	client_i-passphrase -> generateToken() -> T_c_i (unsigned long int)
-	
-	server-passphrase + T_c_i = T_s
-??????????????????????????????
-
-
 
 
 Il protocollo di autenticazione prevede i seguenti passi:
 
-Il client  invia un messaggio di HELO
+	1. Il client invia un messaggio di HELO
 
-il server risponde con un codice di risposta 300
-	invia poi un unsigned long int che contiene la challenge.
-	Il valore che viene inviato dal server è calcolato effettuando:
-		nonce = T_s XOR challenge
-			La challenge è un unsigned long int scelto random dal server (nonce)
+	2. il server risponde con un codice di risposta 300
+		invia poi un unsigned long int che contiene la challenge.
+		Il valore che viene inviato dal server è calcolato effettuando:
+			nonce = T_s XOR challenge
+				La challenge è un unsigned long int scelto random dal server (nonce)
 
 
-Il client estrae la challenge
-	utilizzando il valore di T_s che ha calcolato in primis 
-	Invia poi al server un messaggio AUTH <enc1;enc2> dove:
-	: enc1_c=(T_s 	XOR T_c_i ) 
-	: enc2_c=(T_c_i XOR challenge)
+	3. Il client estrae la challenge
+		utilizzando il valore di T_s che ha calcolato in primis 
+		Invia poi al server un messaggio AUTH <enc1;enc2> dove:
+		: enc1_c=(T_s 	XOR T_c_i ) 
+		: enc2_c=(T_c_i XOR challenge)
 
-Il server 
-	estrae da enc1 la chiave T_c_i ( enc1 XOR T_s )
-	usa T_c_i per verificare enc2 ed estrarre la challenge
-		se il valore è corretto risponde con un codice 200 
-		altrimenti 
-		con un codice 400 e chiude la comunicazione.
+	4. Il server 
+		estrae da enc1 la chiave T_c_i ( enc1 XOR T_s )
+		usa T_c_i per verificare enc2 ed estrarre la challenge
+			se il valore è corretto risponde con un codice 200 
+			altrimenti 
+			con un codice 400 e chiude la comunicazione.
+
+---------------------------------------------------------------------
+Comandi Client
+
+	-h <ip>
+	: ip del server dove connettersi
+	
+	
+	-p <port> 		(default 8888)
+	: porta del server dove connettersi
+
+
+	-l <path> 
+	: richiede la lista dei file presenti nella cartella (corrisponde al comando LST)
+
+
+	-e <cmd [args ...]>
+	: richiede che venga eseguito sul server il comando specificato da cmd [args..] e che venga ritornato il valore di ritorno di esecuzione del comando (corrisponde al comando EXEC)
+	
+
+	-d <src-path> <dest-path> 
+	: richiede che il server si prepari a ricevere il file identificato da <src-path> (client) e lo salvi su <dest-path> (server) (corrisponde al comando DOWNLOAD);
+
+
+	-u <src-path> <dest-path>
+	: richiede che il server invii identificato da <src-path> (server) e che questo venga salvato su <dest-path> (client) (corrisponde al comando UPLOAD).
+	
 
 ---------------------------------------------------------------------
 
 
-I comandi del client sono specificati da linea comandi utilizzando le seguenti opzioni (o con equivalenti sottocomandi):
 
--l  <path> richiede la lista dei file presenti nella cartella (corrisponde al comando LST);
-
--e <cmd [args ...]> richiede che venga eseguito sul server il comando specificato da cmd [args..] e che venga ritornato il valore di ritorno di esecuzione del comando (corrisponde al comando EXEC);
-
--d  <src-path> <dest-path> richiede  che il server si prepari a ricevere il file identificato da <src-path> (client) e lo salvi su <dest-path> (server) (corrisponde al comando DOWNLOAD);
-
--u <src-path> <dest-path> richiede  che il server invii identificato da <src-path> (server) e che questo venga salvato su <dest-path> (client) (corrisponde al comando UPLOAD).
-
-Quando un client viene avviato richiede, oltre all'opzione relativa al comando da inviare al server, anche 2 parametri obbligatori, l'indirizzo ip del server (opzione -h) e la porta su cui il server è in ascolto (opzione -p).
-
-Prima di stabilire la connessione con il server, ogni client richede l'inserimento di due passphrase: quella utilizzata all'avvio del server server-passphrase, ed una specifica per ogni client, client-passphrase (es. i-esimo client avrà la passphrase client_i-passphrase). Queste passphrase saranno utilizzate per la procedura di autenticazione. Il primo messaggio che il client deve inviare dopo l'avvenuta connessione è un messaggio di HELO  per ricevere la challenge da utilizzare nel messaggio AUTH. Dopo che l'autenticazione è andata a buon fine il client può inviare la richiesta al server.
 
 Il progetto può essere sviluppato da una o da due persone.
 
 Al progetto andra' allegata una breve (5-10 pagine) relazione che descriva (e motivi) le scelte progettuali.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
