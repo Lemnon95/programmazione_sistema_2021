@@ -5,10 +5,9 @@
 #include "../../lib/share_lib.h"
 
 int main(int argc, char* argv[]) {
-    std::cout << "Hello World!\n";
+    
+    ShareFunction a(argc, argv);
 
-
-    ShareFunction a;
 
 
     return 0;
