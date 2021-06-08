@@ -2,42 +2,29 @@
 
 // costruttore classe
 ShareFunction::ShareFunction(int argc, char* argv[]) {
-    char* _path=NULL;
-
+    WCHAR* _path = NULL;
     
-
+    // trova il percorso temp
     #ifdef _WIN32
-    WCHAR _t[MAX_PATH + 1] = { 0 }; // instanzio un array di MAX_PATH caratteri, MAX_PATH è definito da windows
-    GetTempPathW(MAX_PATH, _t); // chiedo al sistema il percorso temporaneo, _t conterrà una cella vuota alla fine 
+    _path = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR)); // instanzio un array di MAX_PATH caratteri, MAX_PATH è definito da windows
     
-    _path = (char*)Calloc(MAX_PATH+1,1);// instanzio la variabile path
+    GetTempPathW(MAX_PATH, _path); // chiedo al sistema il percorso temporaneo, _t conterrà una cella vuota alla fine 
     
-    size_t lenTempPath;// variabile che conterrà la grandezza effettiva del path
-    
-    // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/wcstombs-s-wcstombs-s-l?view=msvc-160
-    wcstombs_s(&lenTempPath,
-        _path, 
-        MAX_PATH + 1,
-        (const WCHAR*)_t,
-        MAX_PATH + 1);
-
-    //printf("%d", lenTempPath); // posso ridurre _path da MAX_PATH+1 a 
-    
+    wcscat_s(_path, MAX_PATH, L"server.log");
+    if (errno) {
+        ShowErr("errore appendere nome file a percorso log");
+    }
 
     #else
-    _path = (char*)Calloc(sizeof("/tmp/server.log"), 1); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
-    _path = (char*)"/tmp/server.log";
+    _path = (WCHAR*)Calloc(sizeof("/tmp/server.log"),sizeof(WCHAR)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
+    _path = (WCHAR*)"/tmp/server.log";
     #endif // _WIN32
 
     // parametri di default
     this->parametri = { 8888, 10, NULL, false, _path };
 
-    printf("percorso temporaneo: %s\n",this->parametri.logPath);
-
     // parsing argomenti
-
     unsigned long long maxArg = argc;
-
     while (argc > 0) {
 
         argc -= 1;
@@ -46,23 +33,23 @@ ShareFunction::ShareFunction(int argc, char* argv[]) {
         if (strcmp(argv[argc], "-p") == 0) {
 
             if (argc + 1 >= maxArg) {
-                showErr("parametro -p incompleto");
+                ShowErr("parametro -p incompleto");
                 
             }
 
             if (argv[argc + 1][0] == '-') {
-                showErr("parametro -p incompleto");
+                ShowErr("parametro -p incompleto");
                 
             }
             
             this->parametri.port = atoi(argv[argc + 1]);
             if (errno) {
-                showErr("il parametro di -p non risulta un numero");
+                ShowErr("il parametro di -p non risulta un numero");
                 
             }
 
             if (this->parametri.port == 0) {
-                showErr("porta 0 non è valida");
+                ShowErr("porta 0 non è valida");
             }
 
         }
@@ -71,21 +58,21 @@ ShareFunction::ShareFunction(int argc, char* argv[]) {
         if (strcmp(argv[argc], "-n") == 0) {
 
             if (argc + 1 >= maxArg) {
-                showErr("parametro -n incompleto");
+                ShowErr("parametro -n incompleto");
                 
             }
 
             if (argv[argc + 1][0] == '-') {
-                showErr("parametro -n incompleto");
+                ShowErr("parametro -n incompleto");
             }
 
             this->parametri.nthread = atoi(argv[argc + 1]);
             if (errno) {
-                showErr("il parametro di -n non risulta un numero");
+                ShowErr("il parametro di -n non risulta un numero");
             }
 
             if (this->parametri.nthread == 0) {
-                showErr("numero di thread invalido");
+                ShowErr("numero di thread invalido");
             }
 
 
@@ -95,18 +82,18 @@ ShareFunction::ShareFunction(int argc, char* argv[]) {
         if (strcmp(argv[argc], "-c") == 0) {
 
             if (argc + 1 >= maxArg) {
-                showErr("parametro -c incompleto");
+                ShowErr("parametro -c incompleto");
 
             }
 
             if (argv[argc + 1][0] == '-') {
-                showErr("parametro -c incompleto");
+                ShowErr("parametro -c incompleto");
             }
 
-            this->parametri.configPath = (char*)Calloc(sizeof(argv[argc + 1])+1, 1);
-            this->parametri.configPath = argv[argc + 1];
+            this->parametri.configPath = (WCHAR*)Calloc(sizeof(argv[argc + 1])+1, sizeof(WCHAR));
+            this->parametri.configPath = (WCHAR*)argv[argc + 1];
         }
-
+        
         // -s
         if (strcmp(argv[argc], "-s") == 0) {
             this->parametri.printToken = true;
@@ -116,22 +103,22 @@ ShareFunction::ShareFunction(int argc, char* argv[]) {
         if (strcmp(argv[argc], "-l") == 0) {
 
             if (argc + 1 >= maxArg) {
-                showErr("parametro -l incompleto");
+                ShowErr("parametro -l incompleto");
 
             }
 
             if (argv[argc + 1][0] == '-') {
-                showErr("parametro -l incompleto");
+                ShowErr("parametro -l incompleto");
             }
 
-            this->parametri.logPath = (char*)Calloc(sizeof(argv[argc + 1]) + 1, 1);
-            this->parametri.logPath = argv[argc + 1];
+            this->parametri.logPath = (WCHAR*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(WCHAR));
+            this->parametri.logPath = (WCHAR*)argv[argc + 1];
         }
 
     }
     
-
-    printf("---\n%d\n%d\n%s\n%s\n%d\n---\n", 
+    // debug print
+    printf("---\nPorta: %d\nNumero thread: %d\nConfig path: %ls\nLog path: %ls\nStampa token: %d\n---\n", 
         this->parametri.port, 
         this->parametri.nthread, 
         this->parametri.configPath,
@@ -139,17 +126,88 @@ ShareFunction::ShareFunction(int argc, char* argv[]) {
         this->parametri.printToken);
 
 }
+// distruttore classe
+ShareFunction::~ShareFunction() {
+    // alla distruzione di questa classe
+    printf("distruzione classe\n");
+    if(this->FileDescLog != NULL)
+        this->closeLog();
+}
+
+void ShareFunction::getPassphrase(char* passphrase) {
+    printf("Immetti passphrase (max 254): ");
+    fgets(passphrase, 254, stdin);
+}
+
+unsigned long int ShareFunction::generateToken() {
+
+    char* passphrase = (char*)Calloc(256, sizeof(char));
+
+    this->getPassphrase(passphrase);
+
+    unsigned long int k= 5381;
+    // hashing
+    // stessa phrase stresso hash
+    // no fattori randomici
+    // no fattori di tempo
+    // bisogna basarci solo sull'input
+    // e/o valori costanti
+    for (int i = 0; i < strlen(passphrase); ++i)
+        k = (k * 27) + passphrase[i];
+
+    // reset passphrase
+    Free(passphrase, 256);
+
+    return k;
+}
+
+void ShareFunction::openLog() {
+    // controlla se il file è già aperto
+    if (this->FileDescLog == NULL) {
+        // se non è aperto
+        // apri il file in modalità Append
+        fopen_s(&(this->FileDescLog),(char*)(this->parametri.logPath), "a");
+        // se da errore
+        if (this->FileDescLog == NULL) {
+            ShowErr("errore nell'aprire il file");
+        }
+    }
+    
+}
+
+void ShareFunction::closeLog() {
+    // se è aperto il file
+    if (this->FileDescLog != NULL) {
+        // tenta di chiuderlo
+        if (fclose(this->FileDescLog)) {
+            ShowErr("errore nel chiudere il file log");
+        }
+    }
+    
+}
+
+unsigned long int ShareFunction::getToken_s() {
+
+    this->T_s = this->generateToken();
+
+    if (this->parametri.printToken) {
+        printf("\ntoken: %lu\n", this->T_s);
+    }
+
+    return T_s;
+
+}
 
 // calloc Wrapper
-void* Calloc(size_t nmemb, size_t size) {
+void* Calloc(unsigned long int count, unsigned long int size) {
     
-    if (nmemb == 0 || size == 0) {
+    if (count == 0 || size == 0) {
         fprintf(stderr, "Uno dei due numeri del Calloc è impostato a 0");
         exit(1);
         return NULL;
     }
         
-    void* _t = calloc(nmemb, size);
+    void* _t = calloc(count, size);
     if (_t == 0) {
         fprintf(stderr, "Impossibile allocare memoria");
         exit(1);
@@ -160,10 +218,24 @@ void* Calloc(size_t nmemb, size_t size) {
 }
 
 // fprintf Wrapper
-void showErr(const char* str) {
+void ShowErr(const char* str) {
 
     fprintf(stderr, "%s\n", str);
     exit(1);
     return;
+
+}
+
+// free Wrapper
+void Free(void* arg, int size) {
+
+    if (arg == NULL) {
+        fprintf(stderr, "variabile data a Free() è NULL\n");
+        exit(1);
+        return;
+    }
+
+    memset(arg, '\0', size);
+    free(arg);
 
 }

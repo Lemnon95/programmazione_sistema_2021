@@ -12,17 +12,21 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <stdexcept>
-#include <string>
+//#include <string>
 
 #ifdef _WIN32
 //#include <iostream>
 #include <Windows.h>
 #else
 
+// typedef definite in Windows.h
+typedef wchar_t WCHAR;
 #endif // _WIN32
 
-//#define MAX_PATH 260
+#define MAX_PATH 260
+
+
+
 
 // struttura per mantenere le impostazioni passate da argomenti
 /*
@@ -36,9 +40,9 @@ parametri opzionali:
 struct params {
 	short unsigned int port; // 0 - 65535
 	short unsigned int nthread; //0 - 65535, non più di 65534 poichè saturerebbero le porte disponibili (65535-1 dove -1 è del server stesso)
-	char* configPath; // stringa di lunghezza variabile
+	WCHAR* configPath; // stringa di lunghezza variabile
 	bool printToken; // indice booleano per indicare se printare o meno il token T_s
-	char* logPath; // stringa variabile del percoso dei log
+	WCHAR* logPath; // stringa variabile del percoso dei log
 };
 
 
@@ -46,13 +50,25 @@ class ShareFunction {
 
 public:
 	ShareFunction(int argc, char* argv[]);
+	~ShareFunction();
+	unsigned long int getToken_s();
+
 
 private:
 	params parametri;
+	unsigned long int T_s = 0;
+	FILE* FileDescLog = NULL;
+
+	void getPassphrase(char* passphrase);
+	unsigned long int generateToken();
+	void openLog();
+	void closeLog();
 
 };
 
 // calloc Wrapper
-void* Calloc(size_t nmemb, size_t size);
+void* Calloc(unsigned long int nmemb, unsigned long int size);
 // fprintf Wrapper
-void showErr(const char* str);
+void ShowErr(const char* str);
+// free Wrapper
+void Free(void * arg, int size);

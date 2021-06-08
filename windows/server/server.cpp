@@ -6,8 +6,15 @@
 
 int main(int argc, char* argv[]) {
     
+    // parser input
     ShareFunction a(argc, argv);
 
+    // genera token
+    a.getToken_s();
+
+    // crea threads
+
+    // rimani in ascolto
 
 
     return 0;
