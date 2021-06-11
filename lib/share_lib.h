@@ -58,6 +58,7 @@ private:
 	params parametri;
 	unsigned long int T_s = 0;
 	FILE* FileDescLog = NULL;
+	void parseConfig();
 
 	void getPassphrase(char* passphrase);
 	unsigned long int generateToken();

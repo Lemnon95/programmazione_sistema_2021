@@ -138,6 +138,29 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
 
     // se definito leggi il config
     // sovrascrivi le impostazioni che sono defaut
+    this->parseConfig();
+
+    // debug print
+    wprintf(L"---\nPorta: %d\nNumero thread: %d\nConfig path: %hs \nLog path: %ls \nStampa token: %d\n---\n",
+        this->parametri.port,
+        this->parametri.nthread,
+        this->parametri.configPath,
+        this->parametri.logPath,
+        this->parametri.printToken);
+
+}
+// distruttore classe
+SharedLibServer::~SharedLibServer() {
+    // alla distruzione di questa classe
+    printf("distruzione classe\n");
+    if(this->FileDescLog != NULL)
+        this->closeLog();
+}
+
+void SharedLibServer::parseConfig() {
+
+    // se definito leggi il config
+    // sovrascrivi le impostazioni che sono defaut
     if (this->parametri.configPath != NULL) {
         FILE* _tConf = NULL;
 
@@ -157,21 +180,6 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
 
     }
 
-    // debug print
-    wprintf(L"---\nPorta: %d\nNumero thread: %d\nConfig path: %hs \nLog path: %ls \nStampa token: %d\n---\n",
-        this->parametri.port,
-        this->parametri.nthread,
-        this->parametri.configPath,
-        this->parametri.logPath,
-        this->parametri.printToken);
-
-}
-// distruttore classe
-SharedLibServer::~SharedLibServer() {
-    // alla distruzione di questa classe
-    printf("distruzione classe\n");
-    if(this->FileDescLog != NULL)
-        this->closeLog();
 }
 
 void SharedLibServer::getPassphrase(char* passphrase) {
