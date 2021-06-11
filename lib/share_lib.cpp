@@ -1,7 +1,7 @@
 #include "share_lib.h"
 
 // costruttore classe
-ShareFunction::ShareFunction(int argc, char* argv[]) {
+SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     WCHAR* _path = NULL;
     
     // trova il percorso temp
@@ -90,8 +90,9 @@ ShareFunction::ShareFunction(int argc, char* argv[]) {
                 ShowErr("parametro -c incompleto");
             }
 
-            this->parametri.configPath = (WCHAR*)Calloc(sizeof(argv[argc + 1])+1, sizeof(WCHAR));
-            this->parametri.configPath = (WCHAR*)argv[argc + 1];
+            this->parametri.configPath = (char*)Calloc(sizeof(argv[argc + 1])+1, sizeof(char));
+            this->parametri.configPath = argv[argc + 1];
+            
         }
         
         // -s
@@ -112,34 +113,73 @@ ShareFunction::ShareFunction(int argc, char* argv[]) {
             }
 
             this->parametri.logPath = (WCHAR*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(WCHAR));
-            this->parametri.logPath = (WCHAR*)argv[argc + 1];
+            //this->parametri.logPath = (WCHAR*)argv[argc + 1];
+            mbstowcs_s(NULL,
+                this->parametri.logPath,
+                sizeof(argv[argc + 1]) + 1,
+                argv[argc + 1],
+                sizeof(argv[argc + 1])
+            );
+            if (errno) {
+                ShowErr("errore nel convertire stringa -l");
+            }
         }
 
     }
     
     // debug print
-    printf("---\nPorta: %d\nNumero thread: %d\nConfig path: %ls\nLog path: %ls\nStampa token: %d\n---\n", 
-        this->parametri.port, 
-        this->parametri.nthread, 
+    wprintf(L"---\nPorta: %d\nNumero thread: %d\nConfig path: %hs \nLog path: %ls \nStampa token: %d\n---\n",
+        this->parametri.port,
+        this->parametri.nthread,
+        this->parametri.configPath,
+        this->parametri.logPath,
+        this->parametri.printToken);
+
+
+    // se definito leggi il config
+    // sovrascrivi le impostazioni che sono defaut
+    if (this->parametri.configPath != NULL) {
+        FILE* _tConf = NULL;
+
+        fopen_s(&_tConf, this->parametri.configPath, "r");
+        if (errno) {
+            ShowErr("impossibile aprire (o inesistente) file config");
+        }
+        char line[1024];
+        while (fgets(line, 1024, _tConf)) {
+            printf("%s\n", line);
+
+            // gestione config
+
+
+        }
+        fclose(_tConf);
+
+    }
+
+    // debug print
+    wprintf(L"---\nPorta: %d\nNumero thread: %d\nConfig path: %hs \nLog path: %ls \nStampa token: %d\n---\n",
+        this->parametri.port,
+        this->parametri.nthread,
         this->parametri.configPath,
         this->parametri.logPath,
         this->parametri.printToken);
 
 }
 // distruttore classe
-ShareFunction::~ShareFunction() {
+SharedLibServer::~SharedLibServer() {
     // alla distruzione di questa classe
     printf("distruzione classe\n");
     if(this->FileDescLog != NULL)
         this->closeLog();
 }
 
-void ShareFunction::getPassphrase(char* passphrase) {
+void SharedLibServer::getPassphrase(char* passphrase) {
     printf("Immetti passphrase (max 254): ");
     fgets(passphrase, 254, stdin);
 }
 
-unsigned long int ShareFunction::generateToken() {
+unsigned long int SharedLibServer::generateToken() {
 
     char* passphrase = (char*)Calloc(256, sizeof(char));
 
@@ -161,21 +201,21 @@ unsigned long int ShareFunction::generateToken() {
     return k;
 }
 
-void ShareFunction::openLog() {
+void SharedLibServer::openLog() {
     // controlla se il file è già aperto
     if (this->FileDescLog == NULL) {
         // se non è aperto
         // apri il file in modalità Append
         fopen_s(&(this->FileDescLog),(char*)(this->parametri.logPath), "a");
         // se da errore
-        if (this->FileDescLog == NULL) {
+        if (errno) {
             ShowErr("errore nell'aprire il file");
         }
     }
     
 }
 
-void ShareFunction::closeLog() {
+void SharedLibServer::closeLog() {
     // se è aperto il file
     if (this->FileDescLog != NULL) {
         // tenta di chiuderlo
@@ -186,7 +226,7 @@ void ShareFunction::closeLog() {
     
 }
 
-unsigned long int ShareFunction::getToken_s() {
+unsigned long int SharedLibServer::getToken_s() {
 
     this->T_s = this->generateToken();
 
@@ -219,7 +259,9 @@ void* Calloc(unsigned long int count, unsigned long int size) {
 
 // fprintf Wrapper
 void ShowErr(const char* str) {
-
+    char t[1024];
+    strerror_s(t, 1024, errno);
+    printf("\n%s\n", t);
     fprintf(stderr, "%s\n", str);
     exit(1);
     return;

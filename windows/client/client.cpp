@@ -5,16 +5,8 @@
 #include "../../lib/share_lib.h"
 
 int main(int argc, char* argv[]) {
-    
-    // parser input
-    SharedLibServer a(argc, argv);
 
-    // genera token
-    a.getToken_s();
-
-    // crea threads
-
-    // rimani in ascolto
+    printf("Client\n");
 
 
     return 0;

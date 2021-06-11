@@ -40,17 +40,17 @@ parametri opzionali:
 struct params {
 	short unsigned int port; // 0 - 65535
 	short unsigned int nthread; //0 - 65535, non più di 65534 poichè saturerebbero le porte disponibili (65535-1 dove -1 è del server stesso)
-	WCHAR* configPath; // stringa di lunghezza variabile
+	char* configPath; // stringa di lunghezza variabile
 	bool printToken; // indice booleano per indicare se printare o meno il token T_s
 	WCHAR* logPath; // stringa variabile del percoso dei log
 };
 
 
-class ShareFunction {
+class SharedLibServer {
 
 public:
-	ShareFunction(int argc, char* argv[]);
-	~ShareFunction();
+	SharedLibServer(int argc, char* argv[]);
+	~SharedLibServer();
 	unsigned long int getToken_s();
 
 

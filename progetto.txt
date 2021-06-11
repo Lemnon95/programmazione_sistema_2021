@@ -1,5 +1,7 @@
 Il sistema funziona sia su Windows, sia su Linux anche in modalità mista (server Windows, client Linux e viceversa).
 
+--std=C11
+
 ---------------------------------------------------------------------
 Deamon sotto linux
 
