@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
-//#include <string>
+#include <string>
 
 #ifdef _WIN32
 //#include <iostream>

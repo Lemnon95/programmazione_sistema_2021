@@ -169,10 +169,67 @@ void SharedLibServer::parseConfig() {
             ShowErr("impossibile aprire (o inesistente) file config");
         }
         char line[1024];
+        
+        // gestione config
         while (fgets(line, 1024, _tConf)) {
-            printf("%s\n", line);
 
-            // gestione config
+            char* next_tok = NULL;
+            char* configData = NULL;
+            int i;
+            int printTok,nthread,port = 0;
+            
+            // il primo strtok prende il numero del config
+            i = std::stoi(strtok_s(line, " ", &next_tok));
+            // il secondo strtok ottiene il valore associato
+            configData = strtok_s(next_tok, " ", &next_tok);
+
+            if (configData == NULL) {
+                continue;
+            }
+
+            // i corrisponde al primo valore presente nel file
+            // nello shwitch associo un numero al rispettivo valore
+            // di this->parametri
+            // non è ammessa la modifica del configPath (dato in input)
+            switch (i) 	{
+                case 0:
+                    port = std::stoi(configData);
+                    if (port > 0 && port < 65536) {
+                        this->parametri.port = port;
+                    }
+                    else {
+                        ShowErr("errore nel valore del config per i = 0");
+                    }
+                    break;
+                case 1:
+                    nthread = std::stoi(configData);
+                    if (nthread > 0 && nthread < 65536) {
+                        this->parametri.nthread = nthread;
+                    }
+                    else {
+                        ShowErr("errore nel valore del config per i = 1");
+                    }
+                    break;
+                case 2:
+                    printTok = std::stoi(configData);
+                    if (printTok > 0) {
+                        this->parametri.printToken = true;
+                    }
+                    break;
+                case 3:
+                    mbstowcs_s(NULL,
+                        this->parametri.logPath, 
+                        sizeof(configData)+1, 
+                        configData, 
+                        sizeof(configData)
+                    );
+                    if (errno) {
+                        ShowErr("errore conversione argomento i = 3");
+                    }
+                    break;
+                default:
+                    break;
+            }
 
 
         }
