@@ -13,6 +13,7 @@ int main(int argc, char* argv[]) {
     a.getToken_s();
 
     // crea threads
+    a.spawnSockets();
 
     // rimani in ascolto
 

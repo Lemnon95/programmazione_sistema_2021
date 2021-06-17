@@ -17,7 +17,14 @@
 #ifdef _WIN32
 //#include <iostream>
 #include <Windows.h>
+#include <winsock.h>
 #else
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
+// alias di WinSock per la chiusura del socket
+#define closesocket close
 
 // typedef definite in Windows.h
 typedef wchar_t WCHAR;
@@ -52,16 +59,19 @@ public:
 	SharedLibServer(int argc, char* argv[]);
 	~SharedLibServer();
 	unsigned long int getToken_s();
-
+	void spawnSockets();
 
 private:
 	params parametri;
 	unsigned long int T_s = 0;
 	FILE* FileDescLog = NULL;
 	void parseConfig();
+	int socketMaster = 0;
+	int* socketChild = NULL;
 
 	void getPassphrase(char* passphrase);
 	unsigned long int generateToken();
+	void clearSocket();
 	void openLog();
 	void closeLog();
 

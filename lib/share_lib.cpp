@@ -155,6 +155,8 @@ SharedLibServer::~SharedLibServer() {
     printf("distruzione classe\n");
     if(this->FileDescLog != NULL)
         this->closeLog();
+    
+    this->clearSocket();
 }
 
 void SharedLibServer::parseConfig() {
@@ -266,6 +268,21 @@ unsigned long int SharedLibServer::generateToken() {
     return k;
 }
 
+void SharedLibServer::clearSocket() {
+    // se instanziato, chiudi il socket
+    if (this->socketMaster != 0) {
+        closesocket(this->socketMaster);
+    }
+    
+
+    // TODO: deallocare i socket figli
+
+
+#ifdef _WIN32
+    WSACleanup();
+#endif
+}
+
 void SharedLibServer::openLog() {
     // controlla se il file è già aperto
     if (this->FileDescLog == NULL) {
@@ -300,6 +317,32 @@ unsigned long int SharedLibServer::getToken_s() {
     }
 
     return T_s;
+
+}
+
+void SharedLibServer::spawnSockets() {
+#ifdef _WIN32
+    WSADATA wsaData;
+    int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (iResult != 0) {
+        ShowErr("impossibile avviare WinSock");
+    }
+#endif
+
+    /*
+    PF_INET = Internet Protocol (IP)
+    SOCK_STREAM = TPC/IP
+    */
+    this->socketMaster = socket(PF_INET, SOCK_STREAM, 0);
+    if (this->socketMaster < 0) {
+        this->clearSocket();
+        ShowErr("Errore creazione socket master");
+    }
+
+    // crea socket figli
+    this->socketChild = (int*)Calloc(this->parametri.nthread, sizeof(int));
+
+
 
 }
 
