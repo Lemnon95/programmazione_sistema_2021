@@ -1,4 +1,4 @@
-#include "share_lib.h"
+#include "share_lib_server.h"
 
 // costruttore classe
 SharedLibServer::SharedLibServer(int argc, char* argv[]) {
@@ -273,9 +273,10 @@ void SharedLibServer::clearSocket() {
     if (this->socketMaster != 0) {
         closesocket(this->socketMaster);
     }
-    
-
-    // TODO: deallocare i socket figli
+    // chiudi i socket in ascolto
+    for (int i = 0; i < this->parametri.nthread; i++) {
+        closesocket(this->socketChild[i]);
+    }
 
 
 #ifdef _WIN32
@@ -338,10 +339,31 @@ void SharedLibServer::spawnSockets() {
         this->clearSocket();
         ShowErr("Errore creazione socket master");
     }
+    
 
     // crea socket figli
     this->socketChild = (int*)Calloc(this->parametri.nthread, sizeof(int));
+    
+    // impostazioni base del server
+    struct sockaddr_in masterSettings;
+    masterSettings.sin_family = AF_INET; // protocollo IP
+    masterSettings.sin_addr.s_addr = inet_addr("0.0.0.0"); // server IP
+    masterSettings.sin_port = htons(this->parametri.port); // Server port
+    // apre il server
+    if (bind(this->socketMaster, (struct sockaddr*)&masterSettings, sizeof(masterSettings)) < 0) {
+        ShowErr("Impossibile aprire il socket del server");
+    }
 
+    // TODO: discutedere del backlog
+
+    for (int i = 0; i < this->parametri.nthread; i++) {
+        this->socketChild[i] = listen(this->socketMaster, 10);
+        if (this->socketChild[i] < 0) {
+            ShowErr("errore nell'aprire un socket figlio in ascolto");
+        }
+
+    }
+    
 
 
 }

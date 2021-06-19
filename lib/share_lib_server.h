@@ -18,6 +18,7 @@
 //#include <iostream>
 #include <Windows.h>
 #include <winsock.h>
+#pragma comment(lib,"ws2_32.lib") //Winsock Library
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>

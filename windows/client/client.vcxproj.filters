@@ -18,15 +18,15 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\lib\share_lib.cpp">
-      <Filter>shared_lib</Filter>
-    </ClCompile>
     <ClCompile Include="client.cpp">
       <Filter>File di origine</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\lib\share_lib_client.cpp">
+      <Filter>shared_lib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\lib\share_lib.h">
+    <ClInclude Include="..\..\lib\share_lib_client.h">
       <Filter>shared_lib</Filter>
     </ClInclude>
   </ItemGroup>
