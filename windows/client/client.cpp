@@ -2,12 +2,15 @@
 //
 
 #include <iostream>
-#include "../../lib/share_lib.h"
+#include "../../lib/share_lib_client.h"
 
 int main(int argc, char* argv[]) {
 
-    printf("Client\n");
+    SharedLibClient a;
 
+    a.richiestaFraseServer();
+
+    a.richiestaFraseClient();
 
     return 0;
 }
