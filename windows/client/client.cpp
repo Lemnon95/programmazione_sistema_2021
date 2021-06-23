@@ -6,7 +6,7 @@
 
 int main(int argc, char* argv[]) {
 
-    SharedLibClient a(int argc, char* argv[]);
+    SharedLibClient a(argc,argv);
 
 
 

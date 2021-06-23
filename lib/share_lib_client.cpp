@@ -1,15 +1,10 @@
 
 #include "share_lib_client.h"
 
+
 SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
-#ifdef _WIN32
-    WSADATA wsaData;
-    int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (iResult != 0) {
-        ShowErr("impossibile avviare WinSock");
-    }
-#endif
+
 
 
 
@@ -34,7 +29,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
             }
 
-            inet_pton(AF_INET, argv[argc + 1], &(this->parametri.server.sin_addr));
+            this->parametri.server.sin_addr.s_addr = inet_addr(argv[argc + 1]);
             if (errno) {
                 ShowErr("il parametro di -h non risulta un ip valido");
 
@@ -97,14 +92,6 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
             this->parametri.exec = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
             this->parametri.exec = argv[argc + 1];
-            int i = argc + 2;
-            while (i <= maxArg && argv[i][0] != '-') {
-                int j = sizeof(this->parametri.exec) + 1 + sizeof(argv[i]);
-                this->parametri.exec = (char*)Realloc(this->parametri.exec, j);
-                strcat_s(this->parametri.exec, j, " ");
-                strcat_s(this->parametri.exec, j, argv[i]);
-                i++;
-            }
 
         }
 
@@ -163,12 +150,21 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
         }
     }
 
-    if (this->parametri.server.sin_addr.S_un.S_addr == 0) {
+    if (this->parametri.server.sin_addr.s_addr == 0) {
         ShowErr("indirizzo ip mancante");
     }
 
 
-    printf("\nserver: %d %d\nlst: %s\nexec: %s\ndownload: %s %s\nupload: %s %s\n");
+    printf("\nserver: %d %d\nlst: %s\nexec: %s\ndownload: %s %s\nupload: %s %s\n",
+        this->parametri.server.sin_addr.s_addr,
+        this->parametri.server.sin_port,
+        this->parametri.lst,
+        this->parametri.exec,
+        this->parametri.download.src,
+        this->parametri.download.dest,
+        this->parametri.upload.src,
+        this->parametri.upload.dest
+    );
 
 
 
@@ -237,20 +233,6 @@ void* Calloc(unsigned long int count, unsigned long int size) {
     }
 
     return _t;
-}
-
-// realloc Wrapper
-void* Realloc(void* memblock, size_t size) {
-    if (memblock == NULL || size <= 0) {
-        ShowErr("parametri di Realloc invalidi");
-    }
-
-    memblock = realloc(memblock, size);
-    if (memblock == NULL) {
-        ShowErr("riallocazione fallita");
-    }
-
-    return memblock;
 }
 
 // fprintf Wrapper

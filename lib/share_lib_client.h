@@ -9,7 +9,6 @@
 //#include <iostream>
 #include <Windows.h>
 #include <winsock.h>
-#include <ws2tcpip.h>
 #pragma comment(lib,"ws2_32.lib") //Winsock Library
 #else
 #include <sys/socket.h>
@@ -27,7 +26,7 @@ typedef wchar_t WCHAR;
 
 // parametri di configurazione
 struct params {
-	sockaddr_in server;
+	struct sockaddr_in server;
 	char* lst;
 	char* exec;
 	struct download {
@@ -58,8 +57,6 @@ private:
 
 // calloc Wrapper
 void* Calloc(unsigned long int nmemb, unsigned long int size);
-// realloc Wrapper
-void* Realloc(void* memblock, size_t size);
 // fprintf Wrapper
 void ShowErr(const char* str);
 // free Wrapper
