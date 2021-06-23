@@ -66,12 +66,13 @@ private:
 	params parametri;
 	unsigned long int T_s = 0;
 	FILE* FileDescLog = NULL;
-	void parseConfig();
 	int socketMaster = 0;
 	int* socketChild = NULL;
 
+	void parseConfig();
 	void getPassphrase(char* passphrase);
 	unsigned long int generateToken();
+	unsigned long int hashToken(char* token);
 	void clearSocket();
 	void openLog();
 	void closeLog();

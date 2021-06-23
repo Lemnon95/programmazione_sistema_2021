@@ -6,11 +6,9 @@
 
 int main(int argc, char* argv[]) {
 
-    SharedLibClient a;
+    SharedLibClient a(int argc, char* argv[]);
 
-    a.richiestaFraseServer();
 
-    a.richiestaFraseClient();
 
     return 0;
 }

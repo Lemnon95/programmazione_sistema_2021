@@ -252,18 +252,26 @@ unsigned long int SharedLibServer::generateToken() {
 
     this->getPassphrase(passphrase);
 
-    unsigned long int k= 5381;
+    unsigned long int k = this->hashToken(passphrase);
+
+    // reset passphrase
+    Free(passphrase, 256);
+
+    return k;
+}
+
+unsigned long int SharedLibServer::hashToken(char* token) {
+    // TODO: da discutere
+
+    unsigned long int k = 5381;
     // hashing
     // stessa phrase stresso hash
     // no fattori randomici
     // no fattori di tempo
     // bisogna basarci solo sull'input
     // e/o valori costanti
-    for (int i = 0; i < strlen(passphrase); ++i)
-        k = (k * 27) + passphrase[i];
-
-    // reset passphrase
-    Free(passphrase, 256);
+    for (int i = 0; i < strlen(token); ++i)
+        k = (k * 27) + token[i];
 
     return k;
 }
