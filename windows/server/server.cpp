@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
     a.spawnSockets();
 
     // rimani in ascolto
-
+    a.beginServer();
 
     return 0;
 }

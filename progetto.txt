@@ -5,6 +5,7 @@ Il sistema funziona sia su Windows, sia su Linux anche in modalità mista (serve
 https://www.geeksforgeeks.org/socket-programming-cc/
 https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/
 https://gist.github.com/FedericoPonzi/2a37799b6c601cce6c1b
+https://dzone.com/articles/parallel-tcpip-socket-server-with-multi-threading
 
 ---------------------------------------------------------------------
 Deamon sotto linux

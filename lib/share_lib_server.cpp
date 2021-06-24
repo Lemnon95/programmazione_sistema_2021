@@ -292,6 +292,7 @@ void SharedLibServer::clearSocket() {
 #endif
 }
 
+// TODO: nel scrivedere su log usare flock()
 void SharedLibServer::openLog() {
     // controlla se il file è già aperto
     if (this->FileDescLog == NULL) {
@@ -348,6 +349,13 @@ void SharedLibServer::spawnSockets() {
         ShowErr("Errore creazione socket master");
     }
     
+    int _e = TRUE;
+
+    if (setsockopt(this->socketMaster, SOL_SOCKET, SO_REUSEADDR, (char*)&_e, sizeof(_e)) < 0) {
+        ShowErr("impossibile impostare il socket server");
+    }
+
+
 
     // crea socket figli
     this->socketChild = (int*)Calloc(this->parametri.nthread, sizeof(int));
@@ -361,20 +369,28 @@ void SharedLibServer::spawnSockets() {
     if (bind(this->socketMaster, (struct sockaddr*)&masterSettings, sizeof(masterSettings)) < 0) {
         ShowErr("Impossibile aprire il socket del server");
     }
-
-    // TODO: discutedere del backlog
-
-    for (int i = 0; i < this->parametri.nthread; i++) {
-        this->socketChild[i] = listen(this->socketMaster, 10);
-        if (this->socketChild[i] < 0) {
-            ShowErr("errore nell'aprire un socket figlio in ascolto");
-        }
-
-    }
     
+    if (listen(this->socketMaster, this->parametri.nthread) < 0) {
+        ShowErr("Impossibile stare in ascolto sulla porta specificata");
+    }
 
+    printf("Server in ascolto su porta %d\n", this->parametri.port);
+}
+
+void SharedLibServer::beginServer() {
+
+    // TODO: creare nthread e pargli eseguire Accept()
 
 }
+
+
+void SharedLibServer::Accept() {
+
+    // TODO: gestire richiesta da un thread
+
+}
+
+
 
 // calloc Wrapper
 void* Calloc(unsigned long int count, unsigned long int size) {

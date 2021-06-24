@@ -8,6 +8,7 @@ int main(int argc, char* argv[]) {
 
     SharedLibClient a(argc,argv);
 
+    a.Connect();
 
 
     return 0;

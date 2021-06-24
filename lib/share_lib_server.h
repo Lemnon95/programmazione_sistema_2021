@@ -61,6 +61,8 @@ public:
 	~SharedLibServer();
 	unsigned long int getToken_s();
 	void spawnSockets();
+	void beginServer();
+	void Accept();
 
 private:
 	params parametri;

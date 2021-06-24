@@ -44,15 +44,18 @@ class SharedLibClient {
 public:
 	SharedLibClient(int argc, char* argv[]);
 	~SharedLibClient();
+	void Connect();
 
 private:
 	params parametri;
 	unsigned long int T_s = 0;
 	unsigned long int T_c = 0;
+	int socketClient = 0;
 
 	void getPassphrase(const char* printText, char* passphrase);
 	unsigned long int generateToken(const char* printText);
 	unsigned long int hashToken(char* token);
+	void clearSocket();
 };
 
 // calloc Wrapper

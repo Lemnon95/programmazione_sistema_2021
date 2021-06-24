@@ -4,10 +4,6 @@
 
 SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
-
-
-
-
     this->parametri = { {AF_INET, 8888, {0}}, NULL, NULL, {NULL, NULL}, {NULL,NULL} };
 
     // parsing argomenti
@@ -168,13 +164,40 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
 
 
-    //this->T_s = this->generateToken("Immetti passphrase del server (max 254): ");
+    this->T_s = this->generateToken("Immetti passphrase del server (max 254): ");
 
-    //this->T_c = this->generateToken("Immetti passphrase del client (max 254): ");
+    this->T_c = this->generateToken("Immetti passphrase del client (max 254): ");
 
 }
 
 SharedLibClient::~SharedLibClient() {
+
+    this->clearSocket();
+
+}
+
+void SharedLibClient::Connect() {
+
+#ifdef _WIN32
+    WSADATA wsaData;
+    int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (iResult != 0) {
+        ShowErr("impossibile avviare WinSock");
+    }
+#endif
+
+    this->socketClient = socket(PF_INET, SOCK_STREAM, 0);
+    if (this->socketClient < 0) {
+        this->clearSocket();
+        ShowErr("Errore creazione socket master");
+    }
+
+
+    if (connect(this->socketClient, (struct sockaddr*)&this->parametri.server, sizeof(this->parametri.server)) < 0) {
+        ShowErr("Impossibile connettersi al server");
+    }
+
+
 }
 
 void SharedLibClient::getPassphrase(const char* printText, char* passphrase) {
@@ -210,6 +233,18 @@ unsigned long int SharedLibClient::hashToken(char* token) {
         k = (k * 27) + token[i];
 
     return k;
+}
+
+void SharedLibClient::clearSocket() {
+    // se instanziato, chiudi il socket
+    if (this->socketClient != 0) {
+        closesocket(this->socketClient);
+    }
+
+
+#ifdef _WIN32
+    WSACleanup();
+#endif
 }
 
 
