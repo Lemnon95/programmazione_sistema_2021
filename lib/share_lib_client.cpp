@@ -73,7 +73,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
         }
 
-        // -e <cmd> [<args>...]
+        // -e "<cmd> [<args>...]"
         if (strcmp(argv[argc], "-e") == 0) {
 
             if (argc + 1 >= maxArg) {

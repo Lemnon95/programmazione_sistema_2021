@@ -389,7 +389,7 @@ void SharedLibServer::spawnSockets() {
 
 
 
-    // crea socket figli
+    // crea figli
     this->socketChild = (int*)Calloc(this->parametri.nthread, sizeof(int));
     
     // impostazioni base del server
@@ -411,7 +411,7 @@ void SharedLibServer::spawnSockets() {
 
 void SharedLibServer::beginServer() {
 
-    // TODO: creare nthread e pargli eseguire Accept()
+    // TODO: creare nthread ed eseguire Accept()
 
 }
 
