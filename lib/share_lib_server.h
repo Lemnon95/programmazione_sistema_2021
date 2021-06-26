@@ -6,7 +6,6 @@
 // https://stackoverflow.com/questions/142508/how-do-i-check-os-with-a-preprocessor-directive
 // https://en.wikipedia.org/wiki/C_data_types
 // https://en.cppreference.com/w/cpp/header/stdexcept
-
 #pragma once
 
 #include <stdlib.h>
@@ -23,6 +22,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <cstring>
 
 // alias di WinSock per la chiusura del socket
 #define closesocket close

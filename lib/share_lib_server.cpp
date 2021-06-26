@@ -1,5 +1,10 @@
 #include "share_lib_server.h"
 
+#if defined(_WIN32)
+#define strtok_r strtok_s
+#endif
+
+
 // costruttore classe
 SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     WCHAR* _path = NULL;
@@ -114,6 +119,7 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
 
             this->parametri.logPath = (WCHAR*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(WCHAR));
             //this->parametri.logPath = (WCHAR*)argv[argc + 1];
+            #ifdef _WIN32
             mbstowcs_s(NULL,
                 this->parametri.logPath,
                 sizeof(argv[argc + 1]) + 1,
@@ -123,6 +129,14 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
             if (errno) {
                 ShowErr("errore nel convertire stringa -l");
             }
+            #else
+            if (mbstowcs(this->parametri.logPath,
+            argv[argc + 1],
+            sizeof(argv[argc + 1])
+            ) == -1) {
+            	ShowErr("errore nel convertire stringa -l");
+            }
+            #endif // _WIN32
         }
 
     }
@@ -165,11 +179,15 @@ void SharedLibServer::parseConfig() {
     // sovrascrivi le impostazioni che sono defaut
     if (this->parametri.configPath != NULL) {
         FILE* _tConf = NULL;
-
+	#ifdef _Win32
         fopen_s(&_tConf, this->parametri.configPath, "r");
-        if (errno) {
+        #else
+        _tConf = fopen(this->parametri.configPath, "r");
+        #endif
+        if (errno) { // errno viene settato anche con la fopen, come richiesto da POSIX
             ShowErr("impossibile aprire (o inesistente) file config");
         }
+        
         char line[1024];
         
         // gestione config
@@ -180,10 +198,11 @@ void SharedLibServer::parseConfig() {
             int i;
             int printTok,nthread,port = 0;
             
+            
             // il primo strtok prende il numero del config
-            i = std::stoi(strtok_s(line, " ", &next_tok));
+            i = std::stoi(strtok_r(line, " ", &next_tok));
             // il secondo strtok ottiene il valore associato
-            configData = strtok_s(next_tok, " ", &next_tok);
+            configData = strtok_r(next_tok, " ", &next_tok);
 
             if (configData == NULL) {
                 continue;
@@ -219,6 +238,7 @@ void SharedLibServer::parseConfig() {
                     }
                     break;
                 case 3:
+                    #ifdef _WIN32
                     mbstowcs_s(NULL,
                         this->parametri.logPath, 
                         sizeof(configData)+1, 
@@ -228,6 +248,14 @@ void SharedLibServer::parseConfig() {
                     if (errno) {
                         ShowErr("errore conversione argomento i = 3");
                     }
+                    #elif _linux_  //usato elif e non else perché dava problemi di scope con argv e argc
+                    if(mbstowcs(this->parametri.logPath,
+        	     argv[argc + 1],
+                    sizeof(argv[argc + 1])
+          	     ) == -1) {
+          	     	ShowErr("errore conversione argomento i = 3");
+          	     }
+          	     #endif //_WIN32
                     break;
                 default:
                     break;
@@ -298,7 +326,11 @@ void SharedLibServer::openLog() {
     if (this->FileDescLog == NULL) {
         // se non è aperto
         // apri il file in modalità Append
+        #ifdef _Win32
         fopen_s(&(this->FileDescLog),(char*)(this->parametri.logPath), "a");
+        #else
+        this->FileDescLog = fopen((char*)(this->parametri.logPath), "a");
+        #endif
         // se da errore
         if (errno) {
             ShowErr("errore nell'aprire il file");
@@ -349,7 +381,7 @@ void SharedLibServer::spawnSockets() {
         ShowErr("Errore creazione socket master");
     }
     
-    int _e = TRUE;
+    int _e = true;
 
     if (setsockopt(this->socketMaster, SOL_SOCKET, SO_REUSEADDR, (char*)&_e, sizeof(_e)) < 0) {
         ShowErr("impossibile impostare il socket server");
@@ -414,7 +446,11 @@ void* Calloc(unsigned long int count, unsigned long int size) {
 // fprintf Wrapper
 void ShowErr(const char* str) {
     char t[1024];
+    #ifdef _Win32
     strerror_s(t, 1024, errno);
+    #else
+    strerror_r(errno, t, 1024);
+    #endif
     printf("\n%s\n", t);
     fprintf(stderr, "%s\n", str);
     exit(1);
