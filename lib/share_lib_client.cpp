@@ -220,7 +220,7 @@ unsigned long int SharedLibClient::generateToken(const char* printText) {
 }
 
 unsigned long int SharedLibClient::hashToken(char* token) {
-    // TODO: da discutere
+    
 
     unsigned long int k = 5381;
     // hashing

@@ -1,5 +1,6 @@
 #include "share_lib_server.h"
 
+
 #if defined(_WIN32)
 #define strtok_r strtok_s
 #endif
@@ -179,7 +180,7 @@ void SharedLibServer::parseConfig() {
     // sovrascrivi le impostazioni che sono defaut
     if (this->parametri.configPath != NULL) {
         FILE* _tConf = NULL;
-	#ifdef _Win32
+	#ifdef _WIN32
         fopen_s(&_tConf, this->parametri.configPath, "r");
         #else
         _tConf = fopen(this->parametri.configPath, "r");
@@ -289,7 +290,7 @@ unsigned long int SharedLibServer::generateToken() {
 }
 
 unsigned long int SharedLibServer::hashToken(char* token) {
-    // TODO: da discutere
+    
 
     unsigned long int k = 5381;
     // hashing
@@ -311,7 +312,7 @@ void SharedLibServer::clearSocket() {
     }
     // chiudi i socket in ascolto
     for (int i = 0; i < this->parametri.nthread; i++) {
-        closesocket(this->socketChild[i]);
+        closesocket(this->threadChild[i]);
     }
 
 
@@ -326,7 +327,7 @@ void SharedLibServer::openLog() {
     if (this->FileDescLog == NULL) {
         // se non è aperto
         // apri il file in modalità Append
-        #ifdef _Win32
+        #ifdef _WIN32
         fopen_s(&(this->FileDescLog),(char*)(this->parametri.logPath), "a");
         #else
         this->FileDescLog = fopen((char*)(this->parametri.logPath), "a");
@@ -387,16 +388,32 @@ void SharedLibServer::spawnSockets() {
         ShowErr("impossibile impostare il socket server");
     }
 
-
-
     // crea figli
-    this->socketChild = (int*)Calloc(this->parametri.nthread, sizeof(int));
+    this->threadChild = (int*)Calloc(this->parametri.nthread, sizeof(int));
+
+    // TODO: spawn thread ed esegui funzione accept
+    for (int q = 0; q < this->parametri.nthread; q++) {
+
+    #ifdef _WIN32
+        
+        
+
+        //int* qq = (int*)CreateThread(NULL, 0, this, NULL, 0, NULL);
+    #else // linux
+    #endif
+
+    }
+
+
     
     // impostazioni base del server
     struct sockaddr_in masterSettings;
     masterSettings.sin_family = AF_INET; // protocollo IP
-    masterSettings.sin_addr.s_addr = inet_addr("0.0.0.0"); // server IP
+    inet_pton(AF_INET,"0.0.0.0", &masterSettings.sin_addr); // server IP
     masterSettings.sin_port = htons(this->parametri.port); // Server port
+
+    memset(masterSettings.sin_zero, '\0', sizeof(masterSettings.sin_zero));
+
     // apre il server
     if (bind(this->socketMaster, (struct sockaddr*)&masterSettings, sizeof(masterSettings)) < 0) {
         ShowErr("Impossibile aprire il socket del server");
@@ -411,12 +428,46 @@ void SharedLibServer::spawnSockets() {
 
 void SharedLibServer::beginServer() {
 
-    // TODO: creare nthread ed eseguire Accept()
+    socklen_t addr_size;
 
+    int i = 0,newSocket = 0;
+    // TODO: creare nthread ed eseguire Accept()
+    while (i<3) {
+        //Accept call creates a new socket for the incoming connection
+        addr_size = sizeof(this->socketChild);
+        // bloccante
+        newSocket = accept(this->socketMaster, (struct sockaddr*)&(this->socketChild), &addr_size);
+
+
+        #ifdef _WIN32
+
+        i++;
+      
+
+        #else // linux
+        
+        //for each client request creates a thread and assign the client request to it to process
+        //so the main thread can entertain next request
+        if (pthread_create(&this->threadChild[i++], NULL, (this->Accept), &newSocket) != 0)
+            printf("Failed to create thread\n");
+
+        if (i >= this->parametri.nthread) {
+            i = 0;
+            while (i < this->parametri.nthread) {
+                pthread_join(this->threadChild[i++], NULL);
+            }
+            i = 0;
+        }
+
+        #endif // _WIN32
+
+
+        
+    }
 }
 
 
-void SharedLibServer::Accept() {
+void WINAPI SharedLibServer::Accept() {
 
     // TODO: gestire richiesta da un thread
 
@@ -446,7 +497,7 @@ void* Calloc(unsigned long int count, unsigned long int size) {
 // fprintf Wrapper
 void ShowErr(const char* str) {
     char t[1024];
-    #ifdef _Win32
+    #ifdef _WIN32
     strerror_s(t, 1024, errno);
     #else
     strerror_r(errno, t, 1024);

@@ -14,15 +14,19 @@
 #include <string>
 
 #ifdef _WIN32
+#define _WINSOCKAPI_ 
 //#include <iostream>
 #include <Windows.h>
-#include <winsock.h>
-#pragma comment(lib,"ws2_32.lib") //Winsock Library
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <iphlpapi.h>
+#pragma comment(lib, "Ws2_32.lib")
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <cstring>
+#include <pthread.h>
 
 // alias di WinSock per la chiusura del socket
 #define closesocket close
@@ -54,6 +58,7 @@ struct params {
 };
 
 
+
 class SharedLibServer {
 
 public:
@@ -69,7 +74,8 @@ private:
 	unsigned long int T_s = 0;
 	FILE* FileDescLog = NULL;
 	int socketMaster = 0;
-	int* socketChild = NULL;
+	int* threadChild = NULL;
+	struct sockaddr_storage socketChild;
 
 	void parseConfig();
 	void getPassphrase(char* passphrase);
