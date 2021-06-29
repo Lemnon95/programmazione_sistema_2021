@@ -391,14 +391,16 @@ void SharedLibServer::spawnSockets() {
     // crea figli
     this->threadChild = (int*)Calloc(this->parametri.nthread, sizeof(int));
 
+
     // TODO: spawn thread ed esegui funzione accept
     for (int q = 0; q < this->parametri.nthread; q++) {
 
     #ifdef _WIN32
         
-        
+        int qq = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL);
 
-        //int* qq = (int*)CreateThread(NULL, 0, this, NULL, 0, NULL);
+        this->threadChild[q] = qq;
+
     #else // linux
     #endif
 
@@ -467,9 +469,15 @@ void SharedLibServer::beginServer() {
 }
 
 
-void WINAPI SharedLibServer::Accept() {
+void Accept() {
 
-    // TODO: gestire richiesta da un thread
+    // TODO: mettere in attesa il thread
+
+    // TODO: svegliare 1 thread ad una richiesta di accept
+
+    // TODO: ottenere i dati della richiesta
+
+    // TODO: gestire richiesta 
 
 }
 
