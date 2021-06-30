@@ -397,9 +397,7 @@ void SharedLibServer::spawnSockets() {
 
     #ifdef _WIN32
         
-        int qq = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL);
-
-        this->threadChild[q] = qq;
+        this->threadChild[q] = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL);
 
     #else // linux
     #endif
@@ -471,13 +469,25 @@ void SharedLibServer::beginServer() {
 
 void Accept() {
 
-    // TODO: mettere in attesa il thread
+    while (1) {
+        // TODO: mettere in attesa il thread
+    #ifdef _WIN32
+            SleepConditionVariableCS(Threadwait,);
 
-    // TODO: svegliare 1 thread ad una richiesta di accept
 
-    // TODO: ottenere i dati della richiesta
+    #else //linux
+        // pthread condition variable
+    #endif
 
-    // TODO: gestire richiesta 
+
+        // TODO: svegliare 1 thread ad una richiesta di accept
+
+        // TODO: ottenere i dati della richiesta
+
+        // TODO: gestire richiesta 
+    }
+
+    
 
 }
 

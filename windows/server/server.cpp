@@ -6,6 +6,13 @@
 
 int main(int argc, char* argv[]) {
     
+#ifdef _WIN32
+    CONDITION_VARIABLE Threadwait;
+
+    InitializeConditionVariable(&Threadwait);
+#else
+#endif
+
     // parser input
     SharedLibServer a(argc, argv);
 
