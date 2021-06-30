@@ -21,6 +21,13 @@
 #include <WS2tcpip.h>
 #include <iphlpapi.h>
 #pragma comment(lib, "Ws2_32.lib")
+
+// alias per funzione di linux
+#define strtok_r strtok_s
+// win32 condition variable 
+PCONDITION_VARIABLE Threadwait;
+
+PCRITICAL_SECTION CritSec;
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -56,6 +63,7 @@ struct params {
 	bool printToken; // indice booleano per indicare se printare o meno il token T_s
 	WCHAR* logPath; // stringa variabile del percoso dei log
 };
+
 
 
 

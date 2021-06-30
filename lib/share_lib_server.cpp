@@ -1,11 +1,5 @@
 #include "share_lib_server.h"
 
-
-#if defined(_WIN32)
-#define strtok_r strtok_s
-#endif
-
-
 // costruttore classe
 SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     WCHAR* _path = NULL;
@@ -467,12 +461,15 @@ void SharedLibServer::beginServer() {
 }
 
 
+
 void Accept() {
 
     while (1) {
         // TODO: mettere in attesa il thread
     #ifdef _WIN32
-            SleepConditionVariableCS(Threadwait,);
+        EnterCriticalSection(CritSec);
+
+        SleepConditionVariableCS(Threadwait, CritSec, INFINITE);
 
 
     #else //linux
@@ -485,6 +482,12 @@ void Accept() {
         // TODO: ottenere i dati della richiesta
 
         // TODO: gestire richiesta 
+
+    #ifdef _WIN32
+        LeaveCriticalSection(CritSec);
+    #else //linux
+    #endif // _WIN32
+
     }
 
     

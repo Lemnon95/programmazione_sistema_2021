@@ -5,16 +5,20 @@
 #include "../../lib/share_lib_server.h"
 
 int main(int argc, char* argv[]) {
-    
-#ifdef _WIN32
-    CONDITION_VARIABLE Threadwait;
+    // parser input
+    SharedLibServer a(argc, argv);
 
-    InitializeConditionVariable(&Threadwait);
+
+#ifdef _WIN32
+    
+    InitializeConditionVariable(Threadwait);
+
+    // TODO: creare un metodo per la libreria e passare la condition variable
+
 #else
 #endif
 
-    // parser input
-    SharedLibServer a(argc, argv);
+    
 
     // genera token
     a.getToken_s();
