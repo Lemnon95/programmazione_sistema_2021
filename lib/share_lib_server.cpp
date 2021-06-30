@@ -394,7 +394,8 @@ void SharedLibServer::spawnSockets() {
         this->threadChild[q] = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL);
 
     #else // linux
-
+	if (pthread_create(&this->threadChild[q], NULL, Accept, (void*) NULL) != 0)
+		    printf("Failed to create thread\n");
     #endif
 
     }
