@@ -394,6 +394,7 @@ void SharedLibServer::spawnSockets() {
         this->threadChild[q] = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL);
 
     #else // linux
+
     #endif
 
     }
@@ -426,7 +427,7 @@ void SharedLibServer::beginServer() {
 
     int i = 0,newSocket = 0;
     // TODO: creare nthread ed eseguire Accept()
-    while (i<3) {
+    while (1) {
         //Accept call creates a new socket for the incoming connection
         addr_size = sizeof(this->socketChild);
         // bloccante
@@ -440,6 +441,8 @@ void SharedLibServer::beginServer() {
 
         #else // linux
         
+        // pthread condition variable
+
         //for each client request creates a thread and assign the client request to it to process
         //so the main thread can entertain next request
         if (pthread_create(&this->threadChild[i++], NULL, (this->Accept), &newSocket) != 0)
@@ -473,7 +476,7 @@ void Accept() {
 
 
     #else //linux
-        // pthread condition variable
+        
     #endif
 
 
