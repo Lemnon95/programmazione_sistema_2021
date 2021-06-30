@@ -13,7 +13,6 @@ int main(int argc, char* argv[]) {
     
     InitializeConditionVariable(Threadwait);
 
-    // TODO: creare un metodo per la libreria e passare la condition variable
 
 #else
 #endif
