@@ -34,13 +34,62 @@ PCRITICAL_SECTION CritSec;
 #include <unistd.h>
 #include <cstring>
 #include <pthread.h>
-
+//dichiarazione mutex e condition variables linux
+pthread_mutex_t mutex;
+pthread_cond_t cond_var;
 // alias di WinSock per la chiusura del socket
 #define closesocket close
 
 // typedef definite in Windows.h
 typedef wchar_t WCHAR;
 #endif // _WIN32
+
+//dichiaro la coda portabile
+typedef struct queue {
+	int socket_descriptor;
+	struct queue *link;
+} Queue;
+
+Queue *front;
+Queue *rear;
+
+int size = 0; //queue size
+
+void Enqueue(int type, int value, struct queue **front, struct queue **rear) {
+	Queue *task = NULL;
+	
+	task = (struct queue*)malloc(sizeof(struct queue));
+	task->type = type;
+	task->value = value;
+	task->link = NULL;
+	if ((*rear)) {
+		(*rear)->link = task;
+	}
+	
+	*rear = task;
+	
+	if (!(*front)) {
+		*front = *rear;
+	}
+	
+	size++;
+}
+
+int Dequeue(int *type, int *value, struct queue **front, struct queue **rear){
+	Queue *temp = NULL;
+	if (size == 0){
+		return -1;
+	}
+	temp = *front;
+	*type = temp->type;
+	*value = temp->value;
+	
+	*front = (*front)->link;
+	
+	size--;
+	free(temp);
+	return 0;
+}
 
 #define MAX_PATH 260
 

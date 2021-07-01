@@ -3,13 +3,13 @@
 // costruttore classe
 SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     WCHAR* _path = NULL;
-    
+
     // trova il percorso temp
     #ifdef _WIN32
-    _path = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR)); // instanzio un array di MAX_PATH caratteri, MAX_PATH è definito da windows
-    
-    GetTempPathW(MAX_PATH, _path); // chiedo al sistema il percorso temporaneo, _t conterrà una cella vuota alla fine 
-    
+    _path = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR)); // instanzio un array di MAX_PATH caratteri, MAX_PATH ï¿½ definito da windows
+
+    GetTempPathW(MAX_PATH, _path); // chiedo al sistema il percorso temporaneo, _t conterrï¿½ una cella vuota alla fine
+
     wcscat_s(_path, MAX_PATH, L"server.log");
     if (errno) {
         ShowErr("errore appendere nome file a percorso log");
@@ -28,28 +28,28 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     while (argc > 0) {
 
         argc -= 1;
-        
+
         // -p <port>
         if (strcmp(argv[argc], "-p") == 0) {
 
             if (argc + 1 >= maxArg) {
                 ShowErr("parametro -p incompleto");
-                
+
             }
 
             if (argv[argc + 1][0] == '-') {
                 ShowErr("parametro -p incompleto");
-                
+
             }
-            
+
             this->parametri.port = atoi(argv[argc + 1]);
             if (errno) {
                 ShowErr("il parametro di -p non risulta un numero");
-                
+
             }
 
             if (this->parametri.port == 0) {
-                ShowErr("porta 0 non è valida");
+                ShowErr("porta 0 non ï¿½ valida");
             }
 
         }
@@ -59,7 +59,7 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
 
             if (argc + 1 >= maxArg) {
                 ShowErr("parametro -n incompleto");
-                
+
             }
 
             if (argv[argc + 1][0] == '-') {
@@ -92,9 +92,9 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
 
             this->parametri.configPath = (char*)Calloc(sizeof(argv[argc + 1])+1, sizeof(char));
             this->parametri.configPath = argv[argc + 1];
-            
+
         }
-        
+
         // -s
         if (strcmp(argv[argc], "-s") == 0) {
             this->parametri.printToken = true;
@@ -135,7 +135,7 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
         }
 
     }
-    
+
     // debug print
     wprintf(L"---\nPorta: %d\nNumero thread: %d\nConfig path: %hs \nLog path: %ls \nStampa token: %d\n---\n",
         this->parametri.port,
@@ -164,7 +164,7 @@ SharedLibServer::~SharedLibServer() {
     printf("distruzione classe\n");
     if(this->FileDescLog != NULL)
         this->closeLog();
-    
+
     this->clearSocket();
 }
 
@@ -182,9 +182,9 @@ void SharedLibServer::parseConfig() {
         if (errno) { // errno viene settato anche con la fopen, come richiesto da POSIX
             ShowErr("impossibile aprire (o inesistente) file config");
         }
-        
+
         char line[1024];
-        
+
         // gestione config
         while (fgets(line, 1024, _tConf)) {
 
@@ -192,8 +192,8 @@ void SharedLibServer::parseConfig() {
             char* configData = NULL;
             int i;
             int printTok,nthread,port = 0;
-            
-            
+
+
             // il primo strtok prende il numero del config
             i = std::stoi(strtok_r(line, " ", &next_tok));
             // il secondo strtok ottiene il valore associato
@@ -206,7 +206,7 @@ void SharedLibServer::parseConfig() {
             // i corrisponde al primo valore presente nel file
             // nello shwitch associo un numero al rispettivo valore
             // di this->parametri
-            // non è ammessa la modifica del configPath (dato in input)
+            // non ï¿½ ammessa la modifica del configPath (dato in input)
             switch (i) 	{
                 case 0:
                     port = std::stoi(configData);
@@ -235,15 +235,15 @@ void SharedLibServer::parseConfig() {
                 case 3:
                     #ifdef _WIN32
                     mbstowcs_s(NULL,
-                        this->parametri.logPath, 
-                        sizeof(configData)+1, 
-                        configData, 
+                        this->parametri.logPath,
+                        sizeof(configData)+1,
+                        configData,
                         sizeof(configData)
                     );
                     if (errno) {
                         ShowErr("errore conversione argomento i = 3");
                     }
-                    #elif _linux_  //usato elif e non else perché dava problemi di scope con argv e argc
+                    #elif _linux_  //usato elif e non else perchï¿½ dava problemi di scope con argv e argc
                     if(mbstowcs(this->parametri.logPath,
         	     argv[argc + 1],
                     sizeof(argv[argc + 1])
@@ -284,7 +284,7 @@ unsigned long int SharedLibServer::generateToken() {
 }
 
 unsigned long int SharedLibServer::hashToken(char* token) {
-    
+
 
     unsigned long int k = 5381;
     // hashing
@@ -317,10 +317,10 @@ void SharedLibServer::clearSocket() {
 
 // TODO: nel scrivedere su log usare flock()
 void SharedLibServer::openLog() {
-    // controlla se il file è già aperto
+    // controlla se il file ï¿½ giï¿½ aperto
     if (this->FileDescLog == NULL) {
-        // se non è aperto
-        // apri il file in modalità Append
+        // se non ï¿½ aperto
+        // apri il file in modalitï¿½ Append
         #ifdef _WIN32
         fopen_s(&(this->FileDescLog),(char*)(this->parametri.logPath), "a");
         #else
@@ -331,18 +331,18 @@ void SharedLibServer::openLog() {
             ShowErr("errore nell'aprire il file");
         }
     }
-    
+
 }
 
 void SharedLibServer::closeLog() {
-    // se è aperto il file
+    // se ï¿½ aperto il file
     if (this->FileDescLog != NULL) {
         // tenta di chiuderlo
         if (fclose(this->FileDescLog)) {
             ShowErr("errore nel chiudere il file log");
         }
     }
-    
+
 }
 
 unsigned long int SharedLibServer::getToken_s() {
@@ -375,7 +375,7 @@ void SharedLibServer::spawnSockets() {
         this->clearSocket();
         ShowErr("Errore creazione socket master");
     }
-    
+
     int _e = true;
 
     if (setsockopt(this->socketMaster, SOL_SOCKET, SO_REUSEADDR, (char*)&_e, sizeof(_e)) < 0) {
@@ -390,18 +390,21 @@ void SharedLibServer::spawnSockets() {
     for (int q = 0; q < this->parametri.nthread; q++) {
 
     #ifdef _WIN32
-        
+
         this->threadChild[q] = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL);
 
     #else // linux
-	if (pthread_create(&this->threadChild[q], NULL, Accept, (void*) NULL) != 0)
+    pthread_mutex_init(&mutex, NULL);
+    pthread_cond_init(&cond_var, NULL);
+    // TODO: ricordarsi di fare il destroy
+    if (pthread_create(&this->threadChild[q], NULL, Accept, (void*) NULL) != 0)
 		    printf("Failed to create thread\n");
     #endif
 
     }
 
 
-    
+
     // impostazioni base del server
     struct sockaddr_in masterSettings;
     masterSettings.sin_family = AF_INET; // protocollo IP
@@ -414,7 +417,7 @@ void SharedLibServer::spawnSockets() {
     if (bind(this->socketMaster, (struct sockaddr*)&masterSettings, sizeof(masterSettings)) < 0) {
         ShowErr("Impossibile aprire il socket del server");
     }
-    
+
     if (listen(this->socketMaster, this->parametri.nthread) < 0) {
         ShowErr("Impossibile stare in ascolto sulla porta specificata");
     }
@@ -426,41 +429,34 @@ void SharedLibServer::beginServer() {
 
     socklen_t addr_size;
 
-    int i = 0,newSocket = 0;
+    int newSocket = 0;
     // TODO: creare nthread ed eseguire Accept()
     while (1) {
         //Accept call creates a new socket for the incoming connection
         addr_size = sizeof(this->socketChild);
         // bloccante
         newSocket = accept(this->socketMaster, (struct sockaddr*)&(this->socketChild), &addr_size);
-
+        Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
 
         #ifdef _WIN32
 
         i++;
-      
+
 
         #else // linux
-        
+        pthread_mutex_lock(&mutex);
+		    pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
+		    pthread_mutex_unlock(&mutex);
         // pthread condition variable
 
         //for each client request creates a thread and assign the client request to it to process
         //so the main thread can entertain next request
-        if (pthread_create(&this->threadChild[i++], NULL, (this->Accept), &newSocket) != 0)
-            printf("Failed to create thread\n");
 
-        if (i >= this->parametri.nthread) {
-            i = 0;
-            while (i < this->parametri.nthread) {
-                pthread_join(this->threadChild[i++], NULL);
-            }
-            i = 0;
-        }
 
         #endif // _WIN32
 
 
-        
+
     }
 }
 
@@ -469,6 +465,7 @@ void SharedLibServer::beginServer() {
 void Accept() {
 
     while (1) {
+      int socket_descriptor;
         // TODO: mettere in attesa il thread
     #ifdef _WIN32
         EnterCriticalSection(CritSec);
@@ -477,7 +474,9 @@ void Accept() {
 
 
     #else //linux
-        
+      while(pthread_cond_wait(&cond_var, &mutex) != 0); //thread goes to sleep
+      //now I'm awake
+      Dequeue(&socket_descriptor, &front, &rear);
     #endif
 
 
@@ -485,7 +484,7 @@ void Accept() {
 
         // TODO: ottenere i dati della richiesta
 
-        // TODO: gestire richiesta 
+        // TODO: gestire richiesta
 
     #ifdef _WIN32
         LeaveCriticalSection(CritSec);
@@ -494,7 +493,7 @@ void Accept() {
 
     }
 
-    
+
 
 }
 
@@ -502,13 +501,13 @@ void Accept() {
 
 // calloc Wrapper
 void* Calloc(unsigned long int count, unsigned long int size) {
-    
+
     if (count == 0 || size == 0) {
-        fprintf(stderr, "Uno dei due numeri del Calloc è impostato a 0");
+        fprintf(stderr, "Uno dei due numeri del Calloc ï¿½ impostato a 0");
         exit(1);
         return NULL;
     }
-        
+
     void* _t = calloc(count, size);
     if (_t == 0) {
         fprintf(stderr, "Impossibile allocare memoria");
@@ -538,7 +537,7 @@ void ShowErr(const char* str) {
 void Free(void* arg, int size) {
 
     if (arg == NULL) {
-        fprintf(stderr, "variabile data a Free() è NULL\n");
+        fprintf(stderr, "variabile data a Free() ï¿½ NULL\n");
         exit(1);
         return;
     }
