@@ -394,11 +394,11 @@ void SharedLibServer::spawnSockets() {
         this->threadChild[q] = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL);
 
     #else // linux
-    pthread_mutex_init(&mutex, NULL);
-    pthread_cond_init(&cond_var, NULL);
-    // TODO: ricordarsi di fare il destroy
-    if (pthread_create(&this->threadChild[q], NULL, Accept, (void*) NULL) != 0)
-		    printf("Failed to create thread\n");
+      pthread_mutex_init(&mutex, NULL);
+      pthread_cond_init(&cond_var, NULL);
+      // TODO: ricordarsi di fare il destroy
+      if (pthread_create(&this->threadChild[q], NULL, Accept, (void*) q) != 0)
+  		    printf("Failed to create thread\n");
     #endif
 
     }
@@ -442,30 +442,23 @@ void SharedLibServer::beginServer() {
 
         i++;
 
-
         #else // linux
         pthread_mutex_lock(&mutex);
 		    pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
 		    pthread_mutex_unlock(&mutex);
-        // pthread condition variable
-
-        //for each client request creates a thread and assign the client request to it to process
-        //so the main thread can entertain next request
-
 
         #endif // _WIN32
-
-
 
     }
 }
 
 
 
-void Accept() {
+void Accept(void* rank) {
 
     while (1) {
       int socket_descriptor;
+      long my_rank = (long) rank;
         // TODO: mettere in attesa il thread
     #ifdef _WIN32
         EnterCriticalSection(CritSec);
@@ -475,9 +468,9 @@ void Accept() {
 
     #else //linux
       while(pthread_cond_wait(&cond_var, &mutex) != 0); //thread goes to sleep
+    #endif
       //now I'm awake
       Dequeue(&socket_descriptor, &front, &rear);
-    #endif
 
 
         // TODO: svegliare 1 thread ad una richiesta di accept
