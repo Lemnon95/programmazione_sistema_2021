@@ -55,12 +55,11 @@ Queue *rear;
 
 int size = 0; //queue size
 
-void Enqueue(int type, int value, struct queue **front, struct queue **rear) {
+void Enqueue(int socket_descriptor, struct queue **front, struct queue **rear) {
 	Queue *task = NULL;
 	
 	task = (struct queue*)malloc(sizeof(struct queue));
-	task->type = type;
-	task->value = value;
+	task->socket_descriptor = socket_descriptor;
 	task->link = NULL;
 	if ((*rear)) {
 		(*rear)->link = task;
@@ -75,14 +74,13 @@ void Enqueue(int type, int value, struct queue **front, struct queue **rear) {
 	size++;
 }
 
-int Dequeue(int *type, int *value, struct queue **front, struct queue **rear){
+int Dequeue(int *socket_descriptor, struct queue **front, struct queue **rear){
 	Queue *temp = NULL;
 	if (size == 0){
 		return -1;
 	}
 	temp = *front;
-	*type = temp->type;
-	*value = temp->value;
+	*type = temp->socket_descriptor;
 	
 	*front = (*front)->link;
 	
