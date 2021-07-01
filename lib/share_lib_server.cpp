@@ -70,6 +70,7 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
             if (errno) {
                 ShowErr("il parametro di -n non risulta un numero");
             }
+            thread_number = this->parametri.nthread;
 
             if (this->parametri.nthread == 0) {
                 ShowErr("numero di thread invalido");
@@ -428,9 +429,15 @@ void SharedLibServer::spawnSockets() {
 void SharedLibServer::beginServer() {
 
     socklen_t addr_size;
-
     int newSocket = 0;
-    // TODO: creare nthread ed eseguire Accept()
+    #ifdef __linux__
+    struct sigaction sigIntHandler;
+    sigIntHandler.sa_handler = my_handler;
+    sigemptyset(&sigIntHandler.sa_mask);
+    sigIntHandler.sa_flags = 0;
+    sigaction(SIGINT, &sigIntHandler, NULL);
+    #endif
+
     while (1) {
         //Accept call creates a new socket for the incoming connection
         addr_size = sizeof(this->socketChild);
@@ -456,7 +463,7 @@ void SharedLibServer::beginServer() {
 
 void Accept(void* rank) {
 
-    while (1) {
+    while (!wake_up_all) {
       int socket_descriptor;
       long my_rank = (long) rank;
         // TODO: mettere in attesa il thread
@@ -467,12 +474,17 @@ void Accept(void* rank) {
 
 
     #else //linux
+      pthread_mutex_lock(&mutex);
       while(pthread_cond_wait(&cond_var, &mutex) != 0); //thread goes to sleep
     #endif
       //now I'm awake
-      Dequeue(&socket_descriptor, &front, &rear);
-
-
+      if (!wake_up_all) { //sono sveglio perché ho veramente del lavoro da fare
+        Dequeue(&socket_descriptor, &front, &rear);
+      }
+      #ifdef _WIN32
+      #else //linux
+      pthread_mutex_unlock(&mutex);
+      #endif
         // TODO: svegliare 1 thread ad una richiesta di accept
 
         // TODO: ottenere i dati della richiesta
@@ -485,7 +497,7 @@ void Accept(void* rank) {
     #endif // _WIN32
 
     }
-
+    return NULL;
 
 
 }
@@ -539,3 +551,25 @@ void Free(void* arg, int size) {
     free(arg);
 
 }
+
+/* Handler di CTRL+C */
+#ifdef __linux__
+void my_handler(int s) {
+  printf("Caught signal %d\n",s);
+  /* main thread wakes up other threads */
+	pthread_mutex_lock(&mutex);
+	wake_up_all = true;
+	pthread_cond_broadcast(&cond_var);
+	pthread_mutex_unlock(&mutex);
+
+  /* main thread joins the other threads */
+	for (long i = 0; i < thread_number; i++) {
+		pthread_join(threadChild[i], NULL);
+	}
+  pthread_mutex_destroy(&mutex);
+  pthread_cond_destroy(&cond_var);
+  exit(1);
+}
+#else //windows
+
+#endif // __linux__

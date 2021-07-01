@@ -34,6 +34,7 @@ PCRITICAL_SECTION CritSec;
 #include <unistd.h>
 #include <cstring>
 #include <pthread.h>
+#include <signal.h>
 //dichiarazione mutex e condition variables linux
 pthread_mutex_t mutex;
 pthread_cond_t cond_var;
@@ -44,6 +45,8 @@ pthread_cond_t cond_var;
 typedef wchar_t WCHAR;
 #endif // _WIN32
 
+int thread_number;
+bool wake_up_all = false; //global variable indicating to end all threads
 //dichiaro la coda portabile
 typedef struct queue {
 	int socket_descriptor;
@@ -80,7 +83,7 @@ int Dequeue(int *socket_descriptor, struct queue **front, struct queue **rear){
 		return -1;
 	}
 	temp = *front;
-	*type = temp->socket_descriptor;
+	*socket_descriptor = temp->socket_descriptor;
 	
 	*front = (*front)->link;
 	
@@ -147,3 +150,6 @@ void* Calloc(unsigned long int nmemb, unsigned long int size);
 void ShowErr(const char* str);
 // free Wrapper
 void Free(void * arg, int size);
+//thread function
+void Accept(void* rank);
+
