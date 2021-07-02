@@ -385,8 +385,7 @@ void SharedLibServer::spawnSockets() {
     // crea figli
     this->threadChild = (int*)Calloc(this->parametri.nthread, sizeof(int));
 
-
-    // TODO: spawn thread ed esegui funzione accept
+    // instanzio i thread nella lista
     for (int q = 0; q < this->parametri.nthread; q++) {
 
     #ifdef _WIN32
@@ -426,7 +425,7 @@ void SharedLibServer::beginServer() {
 
     socklen_t addr_size;
 
-    int i = 0,newSocket = 0;
+    int newSocket = 0;
     // TODO: creare nthread ed eseguire Accept()
     while (1) {
         //Accept call creates a new socket for the incoming connection
@@ -434,11 +433,14 @@ void SharedLibServer::beginServer() {
         // bloccante
         newSocket = accept(this->socketMaster, (struct sockaddr*)&(this->socketChild), &addr_size);
 
+        // TODO: inserire newSocket in una coda
 
+
+        // TODO: svegliare 1 thread ad una richiesta di accept
         #ifdef _WIN32
 
-        i++;
-      
+        WakeConditionVariable(Threadwait);
+        
 
         #else // linux
         
@@ -446,7 +448,7 @@ void SharedLibServer::beginServer() {
 
         //for each client request creates a thread and assign the client request to it to process
         //so the main thread can entertain next request
-        if (pthread_create(&this->threadChild[i++], NULL, (this->Accept), &newSocket) != 0)
+        /*if (pthread_create(&this->threadChild[i++], NULL, (this->Accept), &newSocket) != 0)
             printf("Failed to create thread\n");
 
         if (i >= this->parametri.nthread) {
@@ -455,7 +457,7 @@ void SharedLibServer::beginServer() {
                 pthread_join(this->threadChild[i++], NULL);
             }
             i = 0;
-        }
+        }*/
 
         #endif // _WIN32
 
@@ -481,9 +483,7 @@ void Accept() {
     #endif
 
 
-        // TODO: svegliare 1 thread ad una richiesta di accept
-
-        // TODO: ottenere i dati della richiesta
+        // TODO: prendere il newSocket dalla pila
 
         // TODO: gestire richiesta 
 
