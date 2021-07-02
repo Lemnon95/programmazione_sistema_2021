@@ -7,9 +7,9 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     // trova il percorso temp
     #ifdef _WIN32
     _path = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR)); // instanzio un array di MAX_PATH caratteri, MAX_PATH è definito da windows
-    
-    GetTempPathW(MAX_PATH, _path); // chiedo al sistema il percorso temporaneo, _t conterrà una cella vuota alla fine 
-    
+
+    GetTempPathW(MAX_PATH, _path); // chiedo al sistema il percorso temporaneo, _t conterrà una cella vuota alla fine
+
     wcscat_s(_path, MAX_PATH, L"server.log");
     if (errno) {
         ShowErr("errore appendere nome file a percorso log");
@@ -437,7 +437,7 @@ void SharedLibServer::beginServer() {
     sigaction(SIGINT, &sigIntHandler, NULL);
     #endif
 
-    int i = 0,newSocket = 0;
+    int i = 0;
     // TODO: creare nthread ed eseguire Accept()
     while (1) {
         //Accept call creates a new socket for the incoming connection
@@ -451,7 +451,7 @@ void SharedLibServer::beginServer() {
         #ifdef _WIN32
 
         WakeConditionVariable(Threadwait);
-        
+
 
         #else // linux
         pthread_mutex_lock(&mutex);
@@ -465,7 +465,7 @@ void SharedLibServer::beginServer() {
 
 
 
-void Accept(void* rank) {
+void* Accept(void* rank) {
 
     while (!wake_up_all) {
       int socket_descriptor;
@@ -501,7 +501,7 @@ void Accept(void* rank) {
     #endif // _WIN32
 
     }
-
+    return NULL;
 
 }
 
