@@ -378,6 +378,9 @@ void SharedLibServer::spawnSockets() {
     if (iResult != 0) {
         ShowErr("impossibile avviare WinSock");
     }
+
+    InitializeConditionVariable(&Threadwait);
+    InitializeCriticalSection(&CritSec);
 #endif
 
     /*

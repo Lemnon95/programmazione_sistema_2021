@@ -8,17 +8,6 @@ int main(int argc, char* argv[]) {
     // parser input
     SharedLibServer a(argc, argv);
 
-    
-
-
-#ifdef _WIN32
-    
-    InitializeConditionVariable(&Threadwait);
-#else
-#endif
-
-    
-
     // genera token
     a.getToken_s();
 
