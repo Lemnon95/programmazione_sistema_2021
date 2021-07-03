@@ -1,7 +1,7 @@
 // libreria portabile usabile sia su linux che su windows
 // qui tutte le funzioni devono lavorare sia su linux che su windows
-// è cossibile creare una d
-// 
+// ï¿½ cossibile creare una d
+//
 // urls di riferimento
 // https://stackoverflow.com/questions/142508/how-do-i-check-os-with-a-preprocessor-directive
 // https://en.wikipedia.org/wiki/C_data_types
@@ -48,7 +48,7 @@ typedef wchar_t WCHAR;
 #endif //_WIN32
 
 // definizione della coda
-// la struttura conterrà i socket delle connessioni accettate
+// la struttura conterrÃ  i socket delle connessioni accettate
 typedef struct queue {
 	int socket_descriptor;
 	struct queue* link;
@@ -74,7 +74,7 @@ parametri opzionali:
 */
 struct params {
 	short unsigned int port; // 0 - 65535
-	short unsigned int nthread; //0 - 65535, non più di 65534 poichè saturerebbero le porte disponibili (65535-1 dove -1 è del server stesso)
+	short unsigned int nthread; //0 - 65535, non piï¿½ di 65534 poichï¿½ saturerebbero le porte disponibili (65535-1 dove -1 ï¿½ del server stesso)
 	char* configPath; // stringa di lunghezza variabile
 	bool printToken; // indice booleano per indicare se printare o meno il token T_s
 	WCHAR* logPath; // stringa variabile del percoso dei log
@@ -120,5 +120,8 @@ void ShowErr(const char* str);
 // free Wrapper
 void Free(void * arg, int size);
 //thread function
-void Accept(void* rank);
-
+void* Accept(void* rank);
+/* Handler di CTRL+C */
+#ifdef __linux__
+void my_handler(int s);
+#endif // __linux__
