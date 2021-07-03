@@ -2,7 +2,7 @@
 
 // costruttore classe
 SharedLibServer::SharedLibServer(int argc, char* argv[]) {
-    
+
     // gestione segnali
 #ifdef __linux__
     struct sigaction sigIntHandler;
@@ -11,10 +11,10 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     sigIntHandler.sa_flags = 0;
     sigaction(SIGINT, &sigIntHandler, NULL);
 #endif
-    
-    
-    
-    
+
+
+
+
     WCHAR* _path = NULL;
 
     // trova il percorso temp
@@ -320,7 +320,11 @@ void SharedLibServer::clearSocket() {
     }
     // chiudi i socket in ascolto
     for (int i = 0; i < this->parametri.nthread; i++) {
+      #ifdef _WIN32
         closesocket(this->threadChild[i]);
+      #else //_linux_
+        closesocket(threadChild[i]);
+      #endif
     }
 
 
@@ -400,7 +404,11 @@ void SharedLibServer::spawnSockets() {
     }
 
     // crea figli
+    #ifdef _WIN32
     this->threadChild = (int*)Calloc(this->parametri.nthread, sizeof(int));
+    #else
+    threadChild = (pthread_t*)Calloc(this->parametri.nthread, sizeof(pthread_t));
+    #endif
 
     // instanzio i thread nella lista
     for (int q = 0; q < this->parametri.nthread; q++) {
@@ -415,7 +423,7 @@ void SharedLibServer::spawnSockets() {
       pthread_mutex_init(&mutex, NULL);
       pthread_cond_init(&cond_var, NULL);
       // TODO: ricordarsi di fare il destroy
-      if (pthread_create(&this->threadChild[q], NULL, Accept, (void*) q) != 0)
+      if (pthread_create(&threadChild[(long)q], NULL, Accept, (void*) (long)q) != 0)
             printf("Failed to create thread\n");
     #endif
 
@@ -459,7 +467,7 @@ void SharedLibServer::beginServer() {
         #ifdef _WIN32
 
         WakeConditionVariable(&Threadwait);
-        
+
 
         #else // linux
         pthread_mutex_lock(&mutex);

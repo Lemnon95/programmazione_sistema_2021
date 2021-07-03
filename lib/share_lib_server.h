@@ -12,7 +12,7 @@
 #include <string>
 
 #ifdef _WIN32
-#define _WINSOCKAPI_ 
+#define _WINSOCKAPI_
 #include <Windows.h>
 #include <WinSock2.h>
 #include <WS2tcpip.h>
@@ -21,7 +21,7 @@
 
 // alias per funzione di linux
 #define strtok_r strtok_s
-// win32 condition variable 
+// win32 condition variable
 inline CONDITION_VARIABLE Threadwait;
 
 inline CRITICAL_SECTION CritSec;
@@ -35,6 +35,7 @@ inline CRITICAL_SECTION CritSec;
 //dichiarazione mutex e condition variables linux
 pthread_mutex_t mutex;
 pthread_cond_t cond_var;
+pthread_t* threadChild = NULL;
 // alias di WinSock per la chiusura del socket
 #define closesocket close
 
@@ -52,7 +53,7 @@ typedef struct queue {
 inline Queue* front;
 inline Queue* rear;
 
-bool inline wake_up_all = false; //global variable indicating to end all threads 
+bool inline wake_up_all = false; //global variable indicating to end all threads
 int inline size = 0; //queue size
 int inline thread_number;
 
@@ -89,7 +90,9 @@ private:
 	unsigned long int T_s = 0;
 	FILE* FileDescLog = NULL;
 	int socketMaster = 0;
+	#ifdef _WIN32
 	int* threadChild = NULL;
+	#endif //WIN32
 	struct sockaddr_storage socketChild;
 
 	void parseConfig();
