@@ -8,12 +8,12 @@ int main(int argc, char* argv[]) {
     // parser input
     SharedLibServer a(argc, argv);
 
+    
+
 
 #ifdef _WIN32
     
-    InitializeConditionVariable(Threadwait);
-
-
+    InitializeConditionVariable(&Threadwait);
 #else
 #endif
 

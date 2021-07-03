@@ -8,6 +8,9 @@
 // https://en.cppreference.com/w/cpp/header/stdexcept
 #pragma once
 
+// MAX_PATH lunghezza massima per i percorsi di sistema
+#define MAX_PATH 260
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -15,7 +18,6 @@
 
 #ifdef _WIN32
 #define _WINSOCKAPI_ 
-//#include <iostream>
 #include <Windows.h>
 #include <WinSock2.h>
 #include <WS2tcpip.h>
@@ -25,9 +27,9 @@
 // alias per funzione di linux
 #define strtok_r strtok_s
 // win32 condition variable 
-PCONDITION_VARIABLE Threadwait;
+inline CONDITION_VARIABLE Threadwait;
 
-PCRITICAL_SECTION CritSec;
+inline CRITICAL_SECTION CritSec;
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -43,57 +45,21 @@ pthread_cond_t cond_var;
 
 // typedef definite in Windows.h
 typedef wchar_t WCHAR;
-#endif // _WIN32
+#endif //_WIN32
 
-int thread_number;
-bool wake_up_all = false; //global variable indicating to end all threads
-//dichiaro la coda portabile
+// definizione della coda
+// la struttura conterrà i socket delle connessioni accettate
 typedef struct queue {
 	int socket_descriptor;
-	struct queue *link;
+	struct queue* link;
 } Queue;
 
-Queue *front;
-Queue *rear;
+inline Queue* front;
+inline Queue* rear;
 
-int size = 0; //queue size
-
-void Enqueue(int socket_descriptor, struct queue **front, struct queue **rear) {
-	Queue *task = NULL;
-	
-	task = (struct queue*)malloc(sizeof(struct queue));
-	task->socket_descriptor = socket_descriptor;
-	task->link = NULL;
-	if ((*rear)) {
-		(*rear)->link = task;
-	}
-	
-	*rear = task;
-	
-	if (!(*front)) {
-		*front = *rear;
-	}
-	
-	size++;
-}
-
-int Dequeue(int *socket_descriptor, struct queue **front, struct queue **rear){
-	Queue *temp = NULL;
-	if (size == 0){
-		return -1;
-	}
-	temp = *front;
-	*socket_descriptor = temp->socket_descriptor;
-	
-	*front = (*front)->link;
-	
-	size--;
-	free(temp);
-	return 0;
-}
-
-#define MAX_PATH 260
-
+bool inline wake_up_all = false; //global variable indicating to end all threads 
+int inline size = 0; //queue size
+int inline thread_number;
 
 
 
@@ -113,9 +79,6 @@ struct params {
 	bool printToken; // indice booleano per indicare se printare o meno il token T_s
 	WCHAR* logPath; // stringa variabile del percoso dei log
 };
-
-
-
 
 class SharedLibServer {
 
@@ -143,6 +106,12 @@ private:
 	void closeLog();
 
 };
+
+////////////////////////////////////////////////////////////////////////////////////
+
+void Enqueue(int socket_descriptor, struct queue** front, struct queue** rear);
+
+int Dequeue(int* socket_descriptor, struct queue** front, struct queue** rear);
 
 // calloc Wrapper
 void* Calloc(unsigned long int nmemb, unsigned long int size);

@@ -2,6 +2,19 @@
 
 // costruttore classe
 SharedLibServer::SharedLibServer(int argc, char* argv[]) {
+    
+    // gestione segnali
+#ifdef __linux__
+    struct sigaction sigIntHandler;
+    sigIntHandler.sa_handler = my_handler;
+    sigemptyset(&sigIntHandler.sa_mask);
+    sigIntHandler.sa_flags = 0;
+    sigaction(SIGINT, &sigIntHandler, NULL);
+#endif
+    
+    
+    
+    
     WCHAR* _path = NULL;
 
     // trova il percorso temp
@@ -177,9 +190,9 @@ void SharedLibServer::parseConfig() {
         FILE* _tConf = NULL;
 	#ifdef _WIN32
         fopen_s(&_tConf, this->parametri.configPath, "r");
-        #else
+    #else // linux
         _tConf = fopen(this->parametri.configPath, "r");
-        #endif
+    #endif
         if (errno) { // errno viene settato anche con la fopen, come richiesto da POSIX
             ShowErr("impossibile aprire (o inesistente) file config");
         }
@@ -429,15 +442,7 @@ void SharedLibServer::beginServer() {
 
     socklen_t addr_size;
     int newSocket = 0;
-    #ifdef __linux__
-    struct sigaction sigIntHandler;
-    sigIntHandler.sa_handler = my_handler;
-    sigemptyset(&sigIntHandler.sa_mask);
-    sigIntHandler.sa_flags = 0;
-    sigaction(SIGINT, &sigIntHandler, NULL);
-    #endif
 
-    int i = 0,newSocket = 0;
     // TODO: creare nthread ed eseguire Accept()
     while (1) {
         //Accept call creates a new socket for the incoming connection
@@ -450,7 +455,7 @@ void SharedLibServer::beginServer() {
         // TODO: svegliare 1 thread ad una richiesta di accept
         #ifdef _WIN32
 
-        WakeConditionVariable(Threadwait);
+        WakeConditionVariable(&Threadwait);
         
 
         #else // linux
@@ -463,7 +468,8 @@ void SharedLibServer::beginServer() {
     }
 }
 
-
+// end class
+//////////////////////////////////////////////////////////////////////////////////
 
 void Accept(void* rank) {
 
@@ -472,9 +478,9 @@ void Accept(void* rank) {
       long my_rank = (long) rank;
         // TODO: mettere in attesa il thread
     #ifdef _WIN32
-        EnterCriticalSection(CritSec);
+        EnterCriticalSection(&CritSec);
 
-        SleepConditionVariableCS(Threadwait, CritSec, INFINITE);
+        SleepConditionVariableCS(&Threadwait, &CritSec, INFINITE);
 
 
     #else //linux
@@ -496,7 +502,7 @@ void Accept(void* rank) {
         // TODO: gestire richiesta
 
     #ifdef _WIN32
-        LeaveCriticalSection(CritSec);
+        LeaveCriticalSection(&CritSec);
     #else //linux
     #endif // _WIN32
 
@@ -505,6 +511,39 @@ void Accept(void* rank) {
 
 }
 
+void Enqueue(int socket_descriptor, struct queue** front, struct queue** rear) {
+    Queue* task = NULL;
+
+    task = (struct queue*)malloc(sizeof(struct queue));
+    task->socket_descriptor = socket_descriptor;
+    task->link = NULL;
+    if ((*rear)) {
+        (*rear)->link = task;
+    }
+
+    *rear = task;
+
+    if (!(*front)) {
+        *front = *rear;
+    }
+
+    size++;
+}
+
+int Dequeue(int* socket_descriptor, struct queue** front, struct queue** rear) {
+    Queue* temp = NULL;
+    if (size == 0) {
+        return -1;
+    }
+    temp = *front;
+    *socket_descriptor = temp->socket_descriptor;
+
+    *front = (*front)->link;
+
+    size--;
+    free(temp);
+    return 0;
+}
 
 
 // calloc Wrapper
