@@ -424,7 +424,9 @@ void SharedLibServer::spawnSockets() {
     // impostazioni base del server
     struct sockaddr_in masterSettings;
     masterSettings.sin_family = AF_INET; // protocollo IP
-    inet_pton(AF_INET,"0.0.0.0", &masterSettings.sin_addr); // server IP
+    if (!inet_pton(AF_INET, "0.0.0.0", &masterSettings.sin_addr)) {
+        ShowErr("non risulta un ip valido");
+    }
     masterSettings.sin_port = htons(this->parametri.port); // Server port
 
     memset(masterSettings.sin_zero, '\0', sizeof(masterSettings.sin_zero));

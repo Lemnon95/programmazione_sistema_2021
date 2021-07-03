@@ -6,10 +6,13 @@
 #include <string>
 
 #ifdef _WIN32
-//#include <iostream>
+#define _WINSOCKAPI_ 
 #include <Windows.h>
-#include <winsock.h>
-#pragma comment(lib,"ws2_32.lib") //Winsock Library
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <iphlpapi.h>
+#pragma comment(lib, "Ws2_32.lib")
+
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>

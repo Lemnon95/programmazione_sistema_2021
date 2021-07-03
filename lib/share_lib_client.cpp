@@ -25,8 +25,8 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
             }
 
-            this->parametri.server.sin_addr.s_addr = inet_addr(argv[argc + 1]);
-            if (errno) {
+            
+            if (!inet_pton(AF_INET, argv[argc + 1], &this->parametri.server.sin_addr)) {
                 ShowErr("il parametro di -h non risulta un ip valido");
 
             }
