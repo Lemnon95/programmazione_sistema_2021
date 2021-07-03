@@ -443,7 +443,6 @@ void SharedLibServer::beginServer() {
     socklen_t addr_size;
     int newSocket = 0;
 
-    int i = 0,newSocket = 0;
     // TODO: creare nthread ed eseguire Accept()
     while (1) {
         //Accept call creates a new socket for the incoming connection
