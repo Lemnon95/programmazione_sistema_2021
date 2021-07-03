@@ -143,7 +143,7 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
             argv[argc + 1],
             sizeof(argv[argc + 1])
             ) == -1) {
-            	ShowErr("errore nel convertire stringa -l");
+                ShowErr("errore nel convertire stringa -l");
             }
             #endif // _WIN32
         }
@@ -188,7 +188,7 @@ void SharedLibServer::parseConfig() {
     // sovrascrivi le impostazioni che sono defaut
     if (this->parametri.configPath != NULL) {
         FILE* _tConf = NULL;
-	#ifdef _WIN32
+    #ifdef _WIN32
         fopen_s(&_tConf, this->parametri.configPath, "r");
     #else // linux
         _tConf = fopen(this->parametri.configPath, "r");
@@ -259,12 +259,12 @@ void SharedLibServer::parseConfig() {
                     }
                     #elif _linux_  //usato elif e non else perché dava problemi di scope con argv e argc
                     if(mbstowcs(this->parametri.logPath,
-        	     argv[argc + 1],
+                 argv[argc + 1],
                     sizeof(argv[argc + 1])
-          	     ) == -1) {
-          	     	ShowErr("errore conversione argomento i = 3");
-          	     }
-          	     #endif //_WIN32
+                 ) == -1) {
+                    ShowErr("errore conversione argomento i = 3");
+                 }
+                 #endif //_WIN32
                     break;
                 default:
                     break;
@@ -407,19 +407,19 @@ void SharedLibServer::spawnSockets() {
 
     #ifdef _WIN32
 
-        this->threadChild[q] = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL);
+        if ((this->threadChild[q] = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL)) == NULL) {
+            ShowErr("Impossibile creare un thread");
+        }
 
     #else // linux
       pthread_mutex_init(&mutex, NULL);
       pthread_cond_init(&cond_var, NULL);
       // TODO: ricordarsi di fare il destroy
       if (pthread_create(&this->threadChild[q], NULL, Accept, (void*) q) != 0)
-  		    printf("Failed to create thread\n");
+            printf("Failed to create thread\n");
     #endif
 
     }
-
-
 
     // impostazioni base del server
     struct sockaddr_in masterSettings;
@@ -463,8 +463,8 @@ void SharedLibServer::beginServer() {
 
         #else // linux
         pthread_mutex_lock(&mutex);
-		    pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
-		    pthread_mutex_unlock(&mutex);
+            pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
+            pthread_mutex_unlock(&mutex);
 
         #endif // _WIN32
 
@@ -474,41 +474,36 @@ void SharedLibServer::beginServer() {
 // end class
 //////////////////////////////////////////////////////////////////////////////////
 
-
+// Dopo che un thread viene creato esegue questa funzione
 void* Accept(void* rank) {
 
     while (!wake_up_all) {
-      int socket_descriptor;
-      long my_rank = (long) rank;
-        // TODO: mettere in attesa il thread
+        int socket_descriptor;
+        long my_rank = (long) rank;
+
+        // il thread rimane in attesa dello blocco tramite una condition variable
     #ifdef _WIN32
         EnterCriticalSection(&CritSec);
 
         SleepConditionVariableCS(&Threadwait, &CritSec, INFINITE);
-
-
     #else //linux
-      pthread_mutex_lock(&mutex);
-      while(pthread_cond_wait(&cond_var, &mutex) != 0); //thread goes to sleep
+        pthread_mutex_lock(&mutex);
+        while(pthread_cond_wait(&cond_var, &mutex) != 0); //thread goes to sleep
     #endif
-      //now I'm awake
-      if (!wake_up_all) { //sono sveglio perché ho veramente del lavoro da fare
-        Dequeue(&socket_descriptor, &front, &rear);
-      }
-      #ifdef _WIN32
-      #else //linux
-      pthread_mutex_unlock(&mutex);
-      #endif
-        // TODO: svegliare 1 thread ad una richiesta di accept
+        //now I'm awake
 
-        // TODO: prendere il newSocket dalla pila
-
-        // TODO: gestire richiesta
-
+        if (!wake_up_all) { //sono sveglio perché ho veramente del lavoro da fare
+            Dequeue(&socket_descriptor, &front, &rear);
+        }
     #ifdef _WIN32
         LeaveCriticalSection(&CritSec);
     #else //linux
-    #endif // _WIN32
+        pthread_mutex_unlock(&mutex);
+    #endif
+
+        // TODO: gestire richiesta
+
+
 
     }
 
@@ -554,16 +549,12 @@ int Dequeue(int* socket_descriptor, struct queue** front, struct queue** rear) {
 void* Calloc(unsigned long int count, unsigned long int size) {
 
     if (count == 0 || size == 0) {
-        fprintf(stderr, "Uno dei due numeri del Calloc � impostato a 0");
-        exit(1);
-        return NULL;
+        ShowErr("Uno dei due numeri del Calloc è impostato a 0");
     }
 
     void* _t = calloc(count, size);
     if (_t == 0) {
-        fprintf(stderr, "Impossibile allocare memoria");
-        exit(1);
-        return NULL;
+        ShowErr("Impossibile allocare memoria");
     }
 
     return _t;
@@ -573,10 +564,11 @@ void* Calloc(unsigned long int count, unsigned long int size) {
 void ShowErr(const char* str) {
     char t[1024];
     #ifdef _WIN32
-    strerror_s(t, 1024, errno);
+        strerror_s(t, 1024, errno);
     #else
-    strerror_r(errno, t, 1024);
+        strerror_r(errno, t, 1024);
     #endif
+
     printf("\n%s\n", t);
     fprintf(stderr, "%s\n", str);
     exit(1);
@@ -588,9 +580,7 @@ void ShowErr(const char* str) {
 void Free(void* arg, int size) {
 
     if (arg == NULL) {
-        fprintf(stderr, "variabile data a Free() � NULL\n");
-        exit(1);
-        return;
+        ShowErr("variabile data a Free() è NULL\n");
     }
 
     memset(arg, '\0', size);
@@ -603,15 +593,15 @@ void Free(void* arg, int size) {
 void my_handler(int s) {
   printf("Caught signal %d\n",s);
   /* main thread wakes up other threads */
-	pthread_mutex_lock(&mutex);
-	wake_up_all = true;
-	pthread_cond_broadcast(&cond_var);
-	pthread_mutex_unlock(&mutex);
+    pthread_mutex_lock(&mutex);
+    wake_up_all = true;
+    pthread_cond_broadcast(&cond_var);
+    pthread_mutex_unlock(&mutex);
 
   /* main thread joins the other threads */
-	for (long i = 0; i < thread_number; i++) {
-		pthread_join(threadChild[i], NULL);
-	}
+    for (long i = 0; i < thread_number; i++) {
+        pthread_join(threadChild[i], NULL);
+    }
   pthread_mutex_destroy(&mutex);
   pthread_cond_destroy(&cond_var);
   exit(1);

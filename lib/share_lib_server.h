@@ -1,11 +1,6 @@
 // libreria portabile usabile sia su linux che su windows
 // qui tutte le funzioni devono lavorare sia su linux che su windows
-// � cossibile creare una d
-//
-// urls di riferimento
-// https://stackoverflow.com/questions/142508/how-do-i-check-os-with-a-preprocessor-directive
-// https://en.wikipedia.org/wiki/C_data_types
-// https://en.cppreference.com/w/cpp/header/stdexcept
+
 #pragma once
 
 // MAX_PATH lunghezza massima per i percorsi di sistema
@@ -74,7 +69,7 @@ parametri opzionali:
 */
 struct params {
 	short unsigned int port; // 0 - 65535
-	short unsigned int nthread; //0 - 65535, non pi� di 65534 poich� saturerebbero le porte disponibili (65535-1 dove -1 � del server stesso)
+	short unsigned int nthread; //0 - 65535, non più di 65534 poichè saturerebbero le porte disponibili (65535-1 dove -1 è del server stesso)
 	char* configPath; // stringa di lunghezza variabile
 	bool printToken; // indice booleano per indicare se printare o meno il token T_s
 	WCHAR* logPath; // stringa variabile del percoso dei log
