@@ -200,6 +200,10 @@ void SharedLibClient::Connect() {
         ShowErr("Impossibile connettersi al server");
     }
 
+
+    this->Trasmissione();
+
+
     closesocket(this->socketClient);
 }
 
@@ -236,6 +240,20 @@ unsigned long int SharedLibClient::hashToken(char* token) {
         k = (k * 27) + token[i];
 
     return k;
+}
+
+void SharedLibClient::Trasmissione() {
+
+    // TODO: Client HELO
+    char _t[1024] = "HELO";
+    if (send(this->socketClient, _t, 1024, 0) < 0) {
+        ShowErr("Errore nell'inviare client HELO");
+    }
+
+
+    // TODO: Risposta dal server
+
+
 }
 
 void SharedLibClient::clearSocket() {

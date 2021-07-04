@@ -517,6 +517,12 @@ void* Accept(void* rank) {
     #endif
 
         // TODO: gestire richiesta
+        char _t[1024] = { 0 };
+        recv(socket_descriptor, _t, 1024, 0);
+
+        printf("\nricevuto: %s\n", _t);
+
+
 
 
 
