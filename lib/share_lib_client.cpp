@@ -192,12 +192,15 @@ void SharedLibClient::Connect() {
         ShowErr("Errore creazione socket master");
     }
 
+    
+    if (connect(this->socketClient, (sockaddr*)&(this->parametri.server), sizeof(this->parametri.server)) < 0) {
 
-    if (connect(this->socketClient, (struct sockaddr*)&this->parametri.server, sizeof(this->parametri.server)) < 0) {
+        //wprintf(L"connect function failed with error: %ld\n", WSAGetLastError());
+        this->clearSocket();
         ShowErr("Impossibile connettersi al server");
     }
 
-
+    closesocket(this->socketClient);
 }
 
 void SharedLibClient::getPassphrase(const char* printText, char* passphrase) {

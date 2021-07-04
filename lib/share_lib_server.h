@@ -5,6 +5,7 @@
 
 // MAX_PATH lunghezza massima per i percorsi di sistema
 #define MAX_PATH 260
+#define SERVERLISTEN "0.0.0.0"
 
 #include <stdlib.h>
 #include <stdio.h>

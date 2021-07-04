@@ -54,8 +54,8 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
                 ShowErr("parametro -p incompleto");
 
             }
-
-            this->parametri.port = atoi(argv[argc + 1]);
+            // conversione stringa in unsigned short 
+            this->parametri.port = (unsigned short)strtoul(argv[argc + 1], NULL, 0);
             if (errno) {
                 ShowErr("il parametro di -p non risulta un numero");
 
@@ -414,8 +414,8 @@ void SharedLibServer::spawnSockets() {
     for (int q = 0; q < this->parametri.nthread; q++) {
 
     #ifdef _WIN32
-
-        if ((this->threadChild[q] = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL)) == NULL) {
+        DWORD id = 0;
+        if ((this->threadChild[q] = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), &id, 0, &id)) == NULL) {
             ShowErr("Impossibile creare un thread");
         }
 
@@ -430,14 +430,13 @@ void SharedLibServer::spawnSockets() {
     }
 
     // impostazioni base del server
-    struct sockaddr_in masterSettings;
+    sockaddr_in masterSettings;
+    memset(masterSettings.sin_zero, '\0', sizeof(masterSettings.sin_zero));
     masterSettings.sin_family = AF_INET; // protocollo IP
-    if (!inet_pton(AF_INET, "0.0.0.0", &masterSettings.sin_addr)) {
+    if (!inet_pton(AF_INET, SERVERLISTEN, &masterSettings.sin_addr)) { // server IP
         ShowErr("non risulta un ip valido");
     }
-    masterSettings.sin_port = htons(this->parametri.port); // Server port
-
-    memset(masterSettings.sin_zero, '\0', sizeof(masterSettings.sin_zero));
+    masterSettings.sin_port = this->parametri.port; // Server port
 
     // apre il server
     if (bind(this->socketMaster, (struct sockaddr*)&masterSettings, sizeof(masterSettings)) < 0) {
@@ -448,7 +447,11 @@ void SharedLibServer::spawnSockets() {
         ShowErr("Impossibile stare in ascolto sulla porta specificata");
     }
 
-    printf("Server in ascolto su porta %d\n", this->parametri.port);
+
+    char _t[17] = {0};
+    inet_ntop(AF_INET, &masterSettings.sin_addr, _t,17);
+    printf("\nServer in ascolto su %s:%d\n", _t, masterSettings.sin_port);
+
 }
 
 void SharedLibServer::beginServer() {
@@ -456,7 +459,6 @@ void SharedLibServer::beginServer() {
     socklen_t addr_size;
     int newSocket = 0;
 
-    // TODO: creare nthread ed eseguire Accept()
     while (1) {
         //Accept call creates a new socket for the incoming connection
         addr_size = sizeof(this->socketChild);
@@ -464,6 +466,7 @@ void SharedLibServer::beginServer() {
         newSocket = accept(this->socketMaster, (struct sockaddr*)&(this->socketChild), &addr_size);
         Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
 
+        //printf("\nConnessione in entrata\n");
 
         // TODO: svegliare 1 thread ad una richiesta di accept
         #ifdef _WIN32
@@ -494,6 +497,8 @@ void* Accept(void* rank) {
         // il thread rimane in attesa dello blocco tramite una condition variable
     #ifdef _WIN32
         EnterCriticalSection(&CritSec);
+
+        //printf("thread id: %lu\n", GetCurrentThreadId());
 
         SleepConditionVariableCS(&Threadwait, &CritSec, INFINITE);
     #else //linux
