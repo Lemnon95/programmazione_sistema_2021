@@ -1,4 +1,6 @@
 #include "share_lib_server.h"
+#include <sys/syscall.h>
+#include <sys/types.h>
 
 // costruttore classe
 SharedLibServer::SharedLibServer(int argc, char* argv[]) {
@@ -28,8 +30,8 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
 
     #else
 
-    _path = (char*)Calloc(sizeof("/tmp/server.log"),sizeof(char)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
-    _path = "/tmp/server.log";
+    _path = (char*)Calloc(sizeof("/tmp/server.log")+1,sizeof(char)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
+    strcpy(_path, "/tmp/server.log");
     #endif // _WIN32
 
     // parametri di default
@@ -53,7 +55,7 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
                 ShowErr("parametro -p incompleto");
 
             }
-            // conversione stringa in unsigned short 
+            // conversione stringa in unsigned short
             this->parametri.port = (unsigned short)strtoul(argv[argc + 1], NULL, 0);
             if (errno) {
                 ShowErr("il parametro di -p non risulta un numero");
@@ -127,13 +129,13 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
 
             this->parametri.logPath = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
             this->parametri.logPath = argv[argc + 1];
-            
+
         }
 
     }
 
     // debug print
-    wprintf(L"---\nPorta: %d\nNumero thread: %d\nConfig path: %hs \nLog path: %ls \nStampa token: %d\n---\n",
+    printf("---\nPorta: %d\nNumero thread: %d\nConfig path: %s \nLog path: %s \nStampa token: %d\n---\n",
         this->parametri.port,
         this->parametri.nthread,
         this->parametri.configPath,
@@ -146,7 +148,7 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     this->parseConfig();
 
     // debug print
-    wprintf(L"---\nPorta: %d\nNumero thread: %d\nConfig path: %hs \nLog path: %ls \nStampa token: %d\n---\n",
+    printf("---\nPorta: %d\nNumero thread: %d\nConfig path: %s \nLog path: %s \nStampa token: %d\n---\n",
         this->parametri.port,
         this->parametri.nthread,
         this->parametri.configPath,
@@ -230,7 +232,7 @@ void SharedLibServer::parseConfig() {
                     break;
                 case 3:
                     this->parametri.logPath = configData;
-                    
+
                     break;
                 default:
                     break;
@@ -441,8 +443,8 @@ void SharedLibServer::beginServer() {
 
         #else // linux
         pthread_mutex_lock(&mutex);
-            pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
-            pthread_mutex_unlock(&mutex);
+        pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
+        pthread_mutex_unlock(&mutex);
 
         #endif // _WIN32
 
@@ -454,7 +456,6 @@ void SharedLibServer::beginServer() {
 
 // Dopo che un thread viene creato esegue questa funzione
 void* Accept(void* rank) {
-
     while (!wake_up_all) {
         int socket_descriptor;
         long my_rank = (long) rank;
@@ -475,11 +476,22 @@ void* Accept(void* rank) {
         if (!wake_up_all) { //sono sveglio perché ho veramente del lavoro da fare
             Dequeue(&socket_descriptor, &front, &rear);
         }
+        else {
+          pid_t x = syscall(__NR_gettid);
+          printf("Thread %d terminato\n", x); //debug
+          #ifdef _WIN32
+              LeaveCriticalSection(&CritSec);
+          #else //linux
+              pthread_mutex_unlock(&mutex);
+          #endif
+          return NULL;
+        }
     #ifdef _WIN32
         LeaveCriticalSection(&CritSec);
     #else //linux
         pthread_mutex_unlock(&mutex);
     #endif
+
 
         // TODO: gestire richiesta
         char _t[1024] = { 0 };
@@ -487,7 +499,7 @@ void* Accept(void* rank) {
 
         printf("\nricevuto: %s\n", _t);
 
-        
+
 
 
 
@@ -577,13 +589,12 @@ void Free(void* arg, int size) {
 /* Handler di CTRL+C */
 #ifdef __linux__
 void my_handler(int s) {
-  printf("Caught signal %d\n",s);
+  printf("\nCaught signal %d\n",s);
   /* main thread wakes up other threads */
     pthread_mutex_lock(&mutex);
     wake_up_all = true;
     pthread_cond_broadcast(&cond_var);
     pthread_mutex_unlock(&mutex);
-
   /* main thread joins the other threads */
     for (long i = 0; i < thread_number; i++) {
         pthread_join(threadChild[i], NULL);
