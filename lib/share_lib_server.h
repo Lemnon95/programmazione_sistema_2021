@@ -34,9 +34,9 @@ inline CRITICAL_SECTION CritSec;
 #include <pthread.h>
 #include <signal.h>
 //dichiarazione mutex e condition variables linux
-pthread_mutex_t mutex;
-pthread_cond_t cond_var;
-pthread_t* threadChild = NULL;
+inline pthread_mutex_t mutex;
+inline pthread_cond_t cond_var;
+inline pthread_t* threadChild = NULL;
 // alias di WinSock per la chiusura del socket
 #define closesocket close
 
@@ -74,7 +74,7 @@ struct params {
 	short unsigned int nthread; //0 - 65535, non più di 65534 poichè saturerebbero le porte disponibili (65535-1 dove -1 è del server stesso)
 	char* configPath; // stringa di lunghezza variabile
 	bool printToken; // indice booleano per indicare se printare o meno il token T_s
-	WCHAR* logPath; // stringa variabile del percoso dei log
+	char* logPath; // stringa variabile del percoso dei log
 };
 
 class SharedLibServer {

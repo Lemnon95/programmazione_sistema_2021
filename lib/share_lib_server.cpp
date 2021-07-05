@@ -12,25 +12,24 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     sigaction(SIGINT, &sigIntHandler, NULL);
 #endif
 
-
-
-
-    WCHAR* _path = NULL;
+    char* _path = NULL;
 
     // trova il percorso temp
     #ifdef _WIN32
-    _path = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR)); // instanzio un array di MAX_PATH caratteri, MAX_PATH è definito da windows
+    WCHAR* _Tpath = NULL;
+    _Tpath = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR)); // instanzio un array di MAX_PATH caratteri, MAX_PATH è definito da windows
 
-    GetTempPathW(MAX_PATH, _path); // chiedo al sistema il percorso temporaneo, _t conterrà una cella vuota alla fine
+    GetTempPathW(MAX_PATH, _Tpath); // chiedo al sistema il percorso temporaneo, _t conterrà una cella vuota alla fine
 
-    wcscat_s(_path, MAX_PATH, L"server.log");
+    wcscat_s(_Tpath, MAX_PATH, L"server.log");
     if (errno) {
         ShowErr("errore appendere nome file a percorso log");
     }
 
     #else
-    _path = (WCHAR*)Calloc(sizeof("/tmp/server.log"),sizeof(WCHAR)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
-    _path = (WCHAR*)"/tmp/server.log";
+
+    _path = Calloc(sizeof("/tmp/server.log"),sizeof(char)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
+    _path = "/tmp/server.log";
     #endif // _WIN32
 
     // parametri di default
@@ -414,8 +413,7 @@ void SharedLibServer::spawnSockets() {
     for (int q = 0; q < this->parametri.nthread; q++) {
 
     #ifdef _WIN32
-        DWORD id = 0;
-        if ((this->threadChild[q] = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), &id, 0, &id)) == NULL) {
+        if ((this->threadChild[q] = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL)) == NULL) {
             ShowErr("Impossibile creare un thread");
         }
 
@@ -466,7 +464,7 @@ void SharedLibServer::beginServer() {
         newSocket = accept(this->socketMaster, (struct sockaddr*)&(this->socketChild), &addr_size);
         Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
 
-        //printf("\nConnessione in entrata\n");
+        printf("\nConnessione in entrata\n");
 
         // TODO: svegliare 1 thread ad una richiesta di accept
         #ifdef _WIN32
@@ -498,7 +496,7 @@ void* Accept(void* rank) {
     #ifdef _WIN32
         EnterCriticalSection(&CritSec);
 
-        //printf("thread id: %lu\n", GetCurrentThreadId());
+        printf("thread id: %lu\n", GetCurrentThreadId());
 
         SleepConditionVariableCS(&Threadwait, &CritSec, INFINITE);
     #else //linux
@@ -522,7 +520,7 @@ void* Accept(void* rank) {
 
         printf("\nricevuto: %s\n", _t);
 
-
+        
 
 
 
