@@ -1,6 +1,4 @@
 #include "share_lib_server.h"
-#include <sys/syscall.h>
-#include <sys/types.h>
 
 // costruttore classe
 SharedLibServer::SharedLibServer(int argc, char* argv[]) {
@@ -477,11 +475,12 @@ void* Accept(void* rank) {
             Dequeue(&socket_descriptor, &front, &rear);
         }
         else {
-          pid_t x = syscall(__NR_gettid);
-          printf("Thread %d terminato\n", x); //debug
+          
           #ifdef _WIN32
               LeaveCriticalSection(&CritSec);
           #else //linux
+            pid_t x = syscall(__NR_gettid);
+            printf("Thread %d terminato\n", x); //debug
               pthread_mutex_unlock(&mutex);
           #endif
           return NULL;

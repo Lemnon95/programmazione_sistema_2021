@@ -33,6 +33,9 @@ inline CRITICAL_SECTION CritSec;
 #include <cstring>
 #include <pthread.h>
 #include <signal.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
+
 //dichiarazione mutex e condition variables linux
 inline pthread_mutex_t mutex;
 inline pthread_cond_t cond_var;
