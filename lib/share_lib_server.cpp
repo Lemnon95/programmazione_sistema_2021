@@ -28,7 +28,7 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
 
     #else
 
-    _path = Calloc(sizeof("/tmp/server.log"),sizeof(char)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
+    _path = (char*)Calloc(sizeof("/tmp/server.log"),sizeof(char)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
     _path = "/tmp/server.log";
     #endif // _WIN32
 
@@ -125,26 +125,9 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
                 ShowErr("parametro -l incompleto");
             }
 
-            this->parametri.logPath = (WCHAR*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(WCHAR));
-            //this->parametri.logPath = (WCHAR*)argv[argc + 1];
-            #ifdef _WIN32
-            mbstowcs_s(NULL,
-                this->parametri.logPath,
-                sizeof(argv[argc + 1]) + 1,
-                argv[argc + 1],
-                sizeof(argv[argc + 1])
-            );
-            if (errno) {
-                ShowErr("errore nel convertire stringa -l");
-            }
-            #else
-            if (mbstowcs(this->parametri.logPath,
-            argv[argc + 1],
-            sizeof(argv[argc + 1])
-            ) == -1) {
-                ShowErr("errore nel convertire stringa -l");
-            }
-            #endif // _WIN32
+            this->parametri.logPath = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
+            this->parametri.logPath = argv[argc + 1];
+            
         }
 
     }
@@ -246,24 +229,8 @@ void SharedLibServer::parseConfig() {
                     }
                     break;
                 case 3:
-                    #ifdef _WIN32
-                    mbstowcs_s(NULL,
-                        this->parametri.logPath,
-                        sizeof(configData)+1,
-                        configData,
-                        sizeof(configData)
-                    );
-                    if (errno) {
-                        ShowErr("errore conversione argomento i = 3");
-                    }
-                    #elif _linux_  //usato elif e non else perché dava problemi di scope con argv e argc
-                    if(mbstowcs(this->parametri.logPath,
-                 argv[argc + 1],
-                    sizeof(argv[argc + 1])
-                 ) == -1) {
-                    ShowErr("errore conversione argomento i = 3");
-                 }
-                 #endif //_WIN32
+                    this->parametri.logPath = configData;
+                    
                     break;
                 default:
                     break;
