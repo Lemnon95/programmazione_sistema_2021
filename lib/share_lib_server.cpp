@@ -16,22 +16,25 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     _path = (char*)Calloc(MAX_PATH + 1, sizeof(char));
     // trova il percorso temp
     #ifdef _WIN32
-    WCHAR* _Tpath = NULL;
-    _Tpath = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR)); // instanzio un array di MAX_PATH caratteri, MAX_PATH è definito da windows
+    WCHAR* _Tpath = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR)); 
+    // instanzio una stringa di MAX_PATH caratteri, MAX_PATH è definito da Windows
 
-    GetTempPathW(MAX_PATH, _Tpath); // chiedo al sistema il percorso temporaneo, _t conterrà una cella vuota alla fine
+    GetTempPathW(MAX_PATH, _Tpath); 
+    // chiedo al sistema il percorso temporaneo, _Tpath conterrà una cella vuota alla fine
 
+    // concateno il testo "server.log" al path base della cartella temporanea
     wcscat_s(_Tpath, MAX_PATH, L"server.log");
     if (errno) {
         ShowErr("errore appendere nome file a percorso log");
     }
-
-    wcstombs_s(NULL, _path, MAX_PATH, _Tpath, MAX_PATH);
+    // converto il percorso da WCHAR a char
+    wcstombs_s(NULL, _path, MAX_PATH+1, _Tpath, MAX_PATH+1);
     if (errno) {
         ShowErr("errore convertire WCHAR in char*");
     }
+    // pulisco la variabile _Tpath
+    Free(_Tpath, MAX_PATH + 1);
     #else
-
     //_path = (char*)Calloc(sizeof("/tmp/server.log")+1,sizeof(char)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
     strcpy(_path, "/tmp/server.log");
     #endif // _WIN32
