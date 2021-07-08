@@ -13,7 +13,7 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
 #endif
 
     char* _path = NULL;
-
+    _path = (char*)Calloc(MAX_PATH + 1, sizeof(char));
     // trova il percorso temp
     #ifdef _WIN32
     WCHAR* _Tpath = NULL;
@@ -26,9 +26,13 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
         ShowErr("errore appendere nome file a percorso log");
     }
 
+    wcstombs_s(NULL, _path, MAX_PATH, _Tpath, MAX_PATH);
+    if (errno) {
+        ShowErr("errore convertire WCHAR in char*");
+    }
     #else
 
-    _path = (char*)Calloc(sizeof("/tmp/server.log")+1,sizeof(char)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
+    //_path = (char*)Calloc(sizeof("/tmp/server.log")+1,sizeof(char)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
     strcpy(_path, "/tmp/server.log");
     #endif // _WIN32
 
