@@ -17,6 +17,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <cstring>
 
 // alias di WinSock per la chiusura del socket
 #define closesocket close

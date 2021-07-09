@@ -3,23 +3,14 @@
 // costruttore classe
 SharedLibServer::SharedLibServer(int argc, char* argv[]) {
 
-    // gestione segnali
-#ifdef __linux__
-    struct sigaction sigIntHandler;
-    sigIntHandler.sa_handler = my_handler;
-    sigemptyset(&sigIntHandler.sa_mask);
-    sigIntHandler.sa_flags = 0;
-    sigaction(SIGINT, &sigIntHandler, NULL);
-#endif
-
     char* _path = NULL;
     _path = (char*)Calloc(MAX_PATH + 1, sizeof(char));
     // trova il percorso temp
     #ifdef _WIN32
-    WCHAR* _Tpath = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR)); 
+    WCHAR* _Tpath = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR));
     // instanzio una stringa di MAX_PATH caratteri, MAX_PATH è definito da Windows
 
-    GetTempPathW(MAX_PATH, _Tpath); 
+    GetTempPathW(MAX_PATH, _Tpath);
     // chiedo al sistema il percorso temporaneo, _Tpath conterrà una cella vuota alla fine
 
     // concateno il testo "server.log" al path base della cartella temporanea
@@ -89,7 +80,6 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
             if (errno) {
                 ShowErr("il parametro di -n non risulta un numero");
             }
-            thread_number = this->parametri.nthread;
 
             if (this->parametri.nthread == 0) {
                 ShowErr("numero di thread invalido");
@@ -448,6 +438,7 @@ void SharedLibServer::beginServer() {
 
         #else // linux
         pthread_mutex_lock(&mutex);
+        wake_one = false;
         pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
         pthread_mutex_unlock(&mutex);
 
@@ -461,44 +452,33 @@ void SharedLibServer::beginServer() {
 
 // Dopo che un thread viene creato esegue questa funzione
 void* Accept(void* rank) {
-    while (!wake_up_all) {
-        int socket_descriptor;
-        long my_rank = (long) rank;
-
-        // il thread rimane in attesa dello blocco tramite una condition variable
-    #ifdef _WIN32
+    int socket_descriptor;
+    long my_rank = (long) rank;
+    while (1) {
+        //thread goes to sleep
+        #ifdef _WIN32
         EnterCriticalSection(&CritSec);
 
         printf("thread id: %lu\n", GetCurrentThreadId());
 
         SleepConditionVariableCS(&Threadwait, &CritSec, INFINITE);
-    #else //linux
+        #else //linux
         pthread_mutex_lock(&mutex);
-        while(pthread_cond_wait(&cond_var, &mutex) != 0); //thread goes to sleep
-    #endif
+        while (wake_one) {
+          pthread_cond_wait(&cond_var, &mutex);
+        }
+        wake_one = true;
+        #endif
         //now I'm awake
 
-        if (!wake_up_all) { //sono sveglio perché ho veramente del lavoro da fare
-            Dequeue(&socket_descriptor, &front, &rear);
-        }
-        else {
-          
-          #ifdef _WIN32
-              LeaveCriticalSection(&CritSec);
-          #else //linux
-            pid_t x = syscall(__NR_gettid);
-            printf("Thread %d terminato\n", x); //debug
-              pthread_mutex_unlock(&mutex);
-          #endif
-          return NULL;
-        }
-    #ifdef _WIN32
+        Dequeue(&socket_descriptor, &front, &rear);
+        #ifdef _WIN32
         LeaveCriticalSection(&CritSec);
-    #else //linux
+        #else //linux
         pthread_mutex_unlock(&mutex);
-    #endif
+        #endif
 
-
+        //parte parallela
         // TODO: gestire richiesta
         char _t[1024] = { 0 };
         recv(socket_descriptor, _t, 1024, 0);
@@ -600,24 +580,3 @@ void Free(void* arg, int size) {
     free(arg);
 
 }
-
-/* Handler di CTRL+C */
-#ifdef __linux__
-void my_handler(int s) {
-  printf("\nCaught signal %d\n",s);
-  /* main thread wakes up other threads */
-    pthread_mutex_lock(&mutex);
-    wake_up_all = true;
-    pthread_cond_broadcast(&cond_var);
-    pthread_mutex_unlock(&mutex);
-  /* main thread joins the other threads */
-    for (long i = 0; i < thread_number; i++) {
-        pthread_join(threadChild[i], NULL);
-    }
-  pthread_mutex_destroy(&mutex);
-  pthread_cond_destroy(&cond_var);
-  exit(1);
-}
-#else //windows
-
-#endif // __linux__

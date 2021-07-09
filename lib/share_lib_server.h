@@ -40,6 +40,7 @@ inline CRITICAL_SECTION CritSec;
 inline pthread_mutex_t mutex;
 inline pthread_cond_t cond_var;
 inline pthread_t* threadChild = NULL;
+inline bool wake_one = true;
 // alias di WinSock per la chiusura del socket
 #define closesocket close
 
@@ -56,10 +57,8 @@ typedef struct queue {
 
 inline Queue* front;
 inline Queue* rear;
-
-bool inline wake_up_all = false; //global variable indicating to end all threads
 int inline size = 0; //queue size
-int inline thread_number;
+
 
 
 

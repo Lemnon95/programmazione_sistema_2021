@@ -344,7 +344,12 @@ void* Calloc(unsigned long int count, unsigned long int size) {
 // fprintf Wrapper
 void ShowErr(const char* str) {
     char t[1024];
-    strerror_s(t, 1024, errno);
+    #ifdef _WIN32
+        strerror_s(t, 1024, errno);
+    #else
+        strerror_r(errno, t, 1024);
+    #endif
+
     printf("\n%s\n", t);
     fprintf(stderr, "%s\n", str);
     exit(1);
