@@ -242,17 +242,67 @@ unsigned long int SharedLibClient::hashToken(char* token) {
     return k;
 }
 
-void SharedLibClient::Trasmissione() {
-
-    // TODO: Client HELO
-    char _t[1024] = "HELO";
-    if (send(this->socketClient, _t, 1024, 0) < 0) {
-        ShowErr("Errore nell'inviare client HELO");
+void SharedLibClient::Send(const char* str) {
+    
+    if (str == NULL) {
+        return;
     }
 
+    if (send(this->socketClient, str, 1024, 0) < 0) {
+        ShowErr("Errore nell'inviare un messaggio verso il server");
+    }
+}
 
-    // TODO: Risposta dal server
+char* SharedLibClient::Recv() {
+    char _t[1024] = { 0 };
+    if (recv(this->socketClient, _t, 1024, 0) < 0) {
+        ShowErr("Errore nel ricevere un messaggio dal server");
+    }
+    return _t;
+}
 
+char* SharedLibClient::Send_Recv(const char* str=NULL) {
+
+    this->Send(str);
+    
+    char _t[1024] = {0};
+
+    strcpy_s(_t, 1024, this->Recv());
+    if (errno) {
+        ShowErr("errore nel salvare il messaggio del server");
+    }
+
+    return _t;
+}
+
+void SharedLibClient::Trasmissione() {
+
+    unsigned long int challenge = 0;
+    unsigned long int enc1 = 0;
+    unsigned long int enc2 = 0;
+    /*
+    1. invio HELO
+    2. ricevo la challenge
+    3. risolvo la challenge
+    4. compongo AUTH
+    5. invio AUTH
+    6. ottengo il risultato
+    comandi ulteriori
+    */
+
+    // passo 1,2
+    char* endP;
+    challenge = strtoul(this->Send_Recv("HELO"), &endP, 10);
+    
+    // passo 3
+    challenge = challenge ^ this->T_s;
+
+    // passo 4,5,6
+    char authmsg[1024] = {0};
+    enc1 = this->T_s ^ this->T_c;
+    enc2 = this->T_c ^ challenge;
+    sprintf_s(authmsg, 1024, "AUTH %lu;%lu", enc1,enc2);
+    this->Send_Recv(authmsg);
 
 }
 

@@ -505,7 +505,16 @@ void* Accept(void* rank) {
 
         printf("\nricevuto: %s\n", _t);
 
-
+        /*
+        1. ricevere HELO
+        2. generare challenge
+            challenge = T_s XOR rand
+        3. inviare challenge
+        4. ricevere AUTH dal client
+        5. risolve l'auth e risponde nel caso 200 o 400
+        6. printo sul log
+        risposte ai comandi + log
+        */
 
 
 

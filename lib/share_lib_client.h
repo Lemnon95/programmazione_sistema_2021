@@ -58,6 +58,9 @@ private:
 	void getPassphrase(const char* printText, char* passphrase);
 	unsigned long int generateToken(const char* printText);
 	unsigned long int hashToken(char* token);
+	void Send(const char* str);
+	char* Recv();
+	char* Send_Recv(const char* str);
 	void Trasmissione();
 	void clearSocket();
 };
