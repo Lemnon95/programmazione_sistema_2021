@@ -25,7 +25,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
             }
 
-            
+
             if (!inet_pton(AF_INET, argv[argc + 1], &this->parametri.server.sin_addr)) {
                 ShowErr("il parametro di -h non risulta un ip valido");
 
@@ -192,7 +192,7 @@ void SharedLibClient::Connect() {
         ShowErr("Errore creazione socket master");
     }
 
-    
+
     if (connect(this->socketClient, (sockaddr*)&(this->parametri.server), sizeof(this->parametri.server)) < 0) {
 
         //wprintf(L"connect function failed with error: %ld\n", WSAGetLastError());
@@ -227,7 +227,7 @@ unsigned long int SharedLibClient::generateToken(const char* printText) {
 }
 
 unsigned long int SharedLibClient::hashToken(char* token) {
-    
+
 
     unsigned long int k = 5381;
     // hashing
@@ -243,7 +243,7 @@ unsigned long int SharedLibClient::hashToken(char* token) {
 }
 
 void SharedLibClient::Send(const char* str) {
-    
+
     if (str == NULL) {
         return;
     }
@@ -264,10 +264,13 @@ char* SharedLibClient::Recv() {
 char* SharedLibClient::Send_Recv(const char* str=NULL) {
 
     this->Send(str);
-    
-    char _t[1024] = {0};
 
+    char _t[1024] = {0};
+    #ifdef _WIN32
     strcpy_s(_t, 1024, this->Recv());
+    #else //linux
+    strcpy(_t, this->Recv());
+    #endif
     if (errno) {
         ShowErr("errore nel salvare il messaggio del server");
     }
@@ -293,7 +296,7 @@ void SharedLibClient::Trasmissione() {
     // passo 1,2
     char* endP;
     challenge = strtoul(this->Send_Recv("HELO"), &endP, 10);
-    
+
     // passo 3
     challenge = challenge ^ this->T_s;
 
@@ -301,7 +304,11 @@ void SharedLibClient::Trasmissione() {
     char authmsg[1024] = {0};
     enc1 = this->T_s ^ this->T_c;
     enc2 = this->T_c ^ challenge;
+    #ifdef _WIN32
     sprintf_s(authmsg, 1024, "AUTH %lu;%lu", enc1,enc2);
+    #else //_linux_
+    sprintf(authmsg, "AUTH %lu;%lu", enc1,enc2);
+    #endif
     this->Send_Recv(authmsg);
 
 }
@@ -326,7 +333,7 @@ void SharedLibClient::clearSocket() {
 void* Calloc(unsigned long int count, unsigned long int size) {
 
     if (count == 0 || size == 0) {
-        fprintf(stderr, "Uno dei due numeri del Calloc è impostato a 0");
+        fprintf(stderr, "Uno dei due numeri del Calloc ï¿½ impostato a 0");
         exit(1);
         return NULL;
     }
@@ -361,7 +368,7 @@ void ShowErr(const char* str) {
 void Free(void* arg, int size) {
 
     if (arg == NULL) {
-        fprintf(stderr, "variabile data a Free() è NULL\n");
+        fprintf(stderr, "variabile data a Free() ï¿½ NULL\n");
         exit(1);
         return;
     }
