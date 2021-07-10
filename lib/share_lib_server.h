@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string>
+#include <time.h>
 
 #ifdef _WIN32
 #define _WINSOCKAPI_

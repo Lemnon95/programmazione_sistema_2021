@@ -430,7 +430,6 @@ void SharedLibServer::beginServer() {
 
         printf("\nConnessione in entrata\n");
 
-        // TODO: svegliare 1 thread ad una richiesta di accept
         #ifdef _WIN32
 
         WakeConditionVariable(&Threadwait);
@@ -447,11 +446,15 @@ void SharedLibServer::beginServer() {
     }
 }
 
+
 // end class
 //////////////////////////////////////////////////////////////////////////////////
 
 // Dopo che un thread viene creato esegue questa funzione
 void* Accept(void* rank) {
+
+    srand(time(NULL));
+
     int socket_descriptor;
     long my_rank = (long) rank;
     while (1) {
@@ -479,11 +482,8 @@ void* Accept(void* rank) {
         #endif
 
         //parte parallela
-        // TODO: gestire richiesta
-        char _t[1024] = { 0 };
-        recv(socket_descriptor, _t, 1024, 0);
 
-        printf("\nricevuto: %s\n", _t);
+        char _t[1024] = { 0 };
 
         /*
         1. ricevere HELO
@@ -496,13 +496,131 @@ void* Accept(void* rank) {
         risposte ai comandi + log
         */
 
+        // passo 1
+        strcpy_s(_t, 1024, Recv(socket_descriptor));
+        if (_t != "HELO") {
+            closesocket(socket_descriptor);
+            continue;
+        }
 
+        memset(_t, '\0', 1024);
+
+        // passo 2,3,4
+        // TODO: sostituire 0 con T_s
+        unsigned long int nonce = rand() % 2147483647;
+        unsigned long int challenge = 0 ^ nonce;
+        snprintf(_t, 1024, "%lu", challenge);
+        
+        char _auth[1024] = {0};
+        #ifdef WIN32
+        strcpy_s(_auth, 1024, Send_Recv(socket_descriptor, _t, "300"));
+        #else //linux
+        strcpy_s(_auth, Send_Recv(socket_descriptor, _t, "300"));
+        #endif
+
+        // passo 5
+        char _command[1024] = { 0 };
+        // AUTH
+        #ifdef WIN32
+        strcpy_s(_command, 1024, strtok(_auth, " ;"));
+        #else //linux
+        strcpy_s(_command, strtok(_auth, " ;"));
+        #endif
+        
+        if (_command != "AUTH") {
+            closesocket(socket_descriptor);
+            continue;
+        }
+        
+        memset(_command, '\0', 1024);
+        
+        // enc1
+        #ifdef WIN32
+        strcpy_s(_command, 1024, strtok(NULL, " ;"));
+        #else //linux
+        strcpy_s(_command, strtok(NULL, " ;"));
+        #endif
+        char* endP;
+        // TODO: sostituire 0 con T_s
+        unsigned long int T_c = 0 ^ strtoul(_command, &endP, 10);
+
+
+        memset(_command, '\0', 1024);
+
+        // enc2
+        #ifdef WIN32
+        strcpy_s(_command, 1024, strtok(NULL, " ;"));
+        #else //linux
+        strcpy_s(_command, strtok(NULL, " ;"));
+        #endif
+
+        if ((T_c ^ strtoul(_command, &endP, 10)) != nonce) {
+            Send(socket_descriptor, "400");
+            closesocket(socket_descriptor);
+            continue;
+        }
+        Send(socket_descriptor, "200");
+
+        // passo 6
+        // TODO: print to log
 
     }
 
     return NULL;
 }
 
+
+void Send(SOCKET soc, const char* str) {
+
+    if (str == NULL) {
+        return;
+    }
+
+    if (send(soc, str, 1024, 0) < 0) {
+        ShowErr("Errore nell'inviare un messaggio verso il server");
+    }
+}
+
+char* Recv(SOCKET soc) {
+    char _t[1024] = { 0 };
+    if (recv(soc, _t, 1024, 0) < 0) {
+        ShowErr("Errore nel ricevere un messaggio dal server");
+    }
+    return _t;
+}
+
+char* Send_Recv(SOCKET soc, const char* str = NULL, const char* status = NULL) {
+
+    char _t[1024] = { 0 };
+
+    if (status != NULL) {
+        Send(soc, status);
+        if (errno) {
+            ShowErr("errore nel salvare il messaggio del server");
+        }
+    }
+    
+    if (str != NULL) {
+        Send(soc, str);
+        if (errno) {
+            ShowErr("errore nel salvare il messaggio del server");
+        }
+    }
+    
+    #ifdef _WIN32
+    strcpy_s(_t, 1024, Recv(soc));
+    #else //linux
+    strcpy(_t, Recv(soc));
+    #endif
+    if (errno) {
+        ShowErr("errore nel salvare il messaggio del server");
+    }
+    
+    return _t;
+}
+
+
+// funzioni per gestire la pila di socket
 void Enqueue(int socket_descriptor, struct queue** front, struct queue** rear) {
     Queue* task = NULL;
 

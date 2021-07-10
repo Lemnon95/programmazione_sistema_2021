@@ -84,7 +84,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
                 ShowErr("parametro -e incompleto");
             }
 
-            // TODO: allocazione fissa? 1024?
+            
 
             this->parametri.exec = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
             this->parametri.exec = argv[argc + 1];
@@ -316,6 +316,7 @@ void SharedLibClient::Trasmissione() {
     if (status != "300") {
         ShowErr("status code invalido");
     }
+    memset(status, '\0', 1024);
 
     // passo 3
     // XOR tra la challenge ottenuta e la giusta chiave data in input
