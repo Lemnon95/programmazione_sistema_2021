@@ -200,9 +200,12 @@ void SharedLibClient::Connect() {
         ShowErr("Impossibile connettersi al server");
     }
 
-
+    // effettua la connessione ed autenticazione
     this->Trasmissione();
 
+    /*
+    TODO: inviare e gestire comandi passati come args
+    */
 
     closesocket(this->socketClient);
 }
@@ -261,14 +264,26 @@ char* SharedLibClient::Recv() {
     return _t;
 }
 
-char* SharedLibClient::Send_Recv(const char* str=NULL) {
+char* SharedLibClient::Send_Recv(const char* str=NULL, char* status=NULL) {
 
     this->Send(str);
 
     char _t[1024] = {0};
     #ifdef _WIN32
+    if (status != NULL) {
+        strcpy_s(status, 1024, this->Recv());
+        if (errno) {
+            ShowErr("errore nel salvare il messaggio del server");
+        }
+    }
     strcpy_s(_t, 1024, this->Recv());
     #else //linux
+    if (status != NULL) {
+        strcpy(status, this->Recv());
+        if (errno) {
+            ShowErr("errore nel salvare il messaggio del server");
+        }
+    }
     strcpy(_t, this->Recv());
     #endif
     if (errno) {
@@ -295,12 +310,18 @@ void SharedLibClient::Trasmissione() {
 
     // passo 1,2
     char* endP;
-    challenge = strtoul(this->Send_Recv("HELO"), &endP, 10);
+    char status[1024] = {0};
+    challenge = strtoul(this->Send_Recv("HELO", status), &endP, 10);
+
+    if (status != "300") {
+        ShowErr("status code invalido");
+    }
 
     // passo 3
+    // XOR tra la challenge ottenuta e la giusta chiave data in input
     challenge = challenge ^ this->T_s;
 
-    // passo 4,5,6
+    // passo 4,5
     char authmsg[1024] = {0};
     enc1 = this->T_s ^ this->T_c;
     enc2 = this->T_c ^ challenge;
@@ -309,7 +330,23 @@ void SharedLibClient::Trasmissione() {
     #else //_linux_
     sprintf(authmsg, "AUTH %lu;%lu", enc1,enc2);
     #endif
-    this->Send_Recv(authmsg);
+
+    // passo 6
+    #ifdef _WIN32
+    strcpy_s(status, 1024, this->Send_Recv(authmsg));
+    if (errno) {
+        ShowErr("errore nel ottenere lo stato dopo auth");
+    }
+    #else //linux
+    strcpy(status, this->Send_Recv(authmsg));
+    if (errno) {
+        ShowErr("errore nel ottenere lo stato dopo auth");
+    }
+    #endif
+
+    if (status != "200") {
+        ShowErr("Auth errato");
+    }
 
 }
 

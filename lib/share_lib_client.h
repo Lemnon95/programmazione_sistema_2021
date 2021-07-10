@@ -61,7 +61,7 @@ private:
 	unsigned long int hashToken(char* token);
 	void Send(const char* str);
 	char* Recv();
-	char* Send_Recv(const char* str);
+	char* Send_Recv(const char* str, char* status);
 	void Trasmissione();
 	void clearSocket();
 };
