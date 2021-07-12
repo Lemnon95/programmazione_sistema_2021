@@ -27,7 +27,7 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     Free(_Tpath, MAX_PATH + 1);
     #else
     //_path = (char*)Calloc(sizeof("/tmp/server.log")+1,sizeof(char)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
-    strcpy(_path, "/tmp/server.log");
+    Strcpy(_path, "/tmp/server.log", 1024);
     #endif // _WIN32
 
     // parametri di default
@@ -497,7 +497,7 @@ void* Accept(void* rank) {
         */
 
         // passo 1
-        strcpy_s(_t, 1024, Recv(socket_descriptor));
+        Strcpy(_t, 1024, Recv(socket_descriptor));
         if (_t != "HELO") {
             closesocket(socket_descriptor);
             continue;
@@ -515,16 +515,17 @@ void* Accept(void* rank) {
         #ifdef WIN32
         strcpy_s(_auth, 1024, Send_Recv(socket_descriptor, _t, "300"));
         #else //linux
-        strcpy_s(_auth, Send_Recv(socket_descriptor, _t, "300"));
+        strcpy(_auth, Send_Recv(socket_descriptor, _t, "300"));
         #endif
 
         // passo 5
         char _command[1024] = { 0 };
         // AUTH
         #ifdef WIN32
-        strcpy_s(_command, 1024, strtok(_auth, " ;"));
+        char* next_tok = NULL;
+        strcpy_s(_command, 1024, strtok_s(_auth, " ;", &next_tok));
         #else //linux
-        strcpy_s(_command, strtok(_auth, " ;"));
+        strcpy(_command, strtok(_auth, " ;"));
         #endif
         
         if (_command != "AUTH") {
@@ -536,9 +537,9 @@ void* Accept(void* rank) {
         
         // enc1
         #ifdef WIN32
-        strcpy_s(_command, 1024, strtok(NULL, " ;"));
+        strcpy_s(_command, 1024, strtok_s(NULL, " ;", &next_tok));
         #else //linux
-        strcpy_s(_command, strtok(NULL, " ;"));
+        strcpy(_command, strtok(NULL, " ;"));
         #endif
         char* endP;
         // TODO: sostituire 0 con T_s
@@ -549,9 +550,9 @@ void* Accept(void* rank) {
 
         // enc2
         #ifdef WIN32
-        strcpy_s(_command, 1024, strtok(NULL, " ;"));
+        strcpy_s(_command, 1024, strtok_s(NULL, " ;", &next_tok));
         #else //linux
-        strcpy_s(_command, strtok(NULL, " ;"));
+        strcpy(_command, strtok(NULL, " ;"));
         #endif
 
         if ((T_c ^ strtoul(_command, &endP, 10)) != nonce) {
@@ -589,7 +590,7 @@ char* Recv(SOCKET soc) {
     return _t;
 }
 
-char* Send_Recv(SOCKET soc, const char* str = NULL, const char* status = NULL) {
+char* Send_Recv(SOCKET soc, const char* str, const char* status) {
 
     char _t[1024] = { 0 };
 
@@ -696,5 +697,23 @@ void Free(void* arg, int size) {
 
     memset(arg, '\0', size);
     free(arg);
+
+}
+
+// strcpy Wrapper
+void Strcpy(char* dest, unsigned int size, const char* src) {
+
+    if ((sizeof(dest) / sizeof(char)) < size) {
+        ShowErr("Stringa di destinazione troppo piccola Strcpy");
+    }
+
+#ifdef _WIN32
+    strcpy_s(dest, size, src);
+    if (errno) {
+        ShowErr("Errore nel copiare una stringa");
+    }
+#else //linux
+    strncpy(dest, src, size);
+#endif
 
 }

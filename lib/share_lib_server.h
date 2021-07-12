@@ -115,14 +115,23 @@ void Enqueue(int socket_descriptor, struct queue** front, struct queue** rear);
 
 int Dequeue(int* socket_descriptor, struct queue** front, struct queue** rear);
 
+// send-recv Wrapper
+void Send(SOCKET soc, const char* str);
+char* Recv(SOCKET soc);
+char* Send_Recv(SOCKET soc, const char* str = NULL, const char* status = NULL);
+
+
 // calloc Wrapper
 void* Calloc(unsigned long int nmemb, unsigned long int size);
 // fprintf Wrapper
 void ShowErr(const char* str);
 // free Wrapper
 void Free(void * arg, int size);
-//thread function
+// thread function
 void* Accept(void* rank);
+// strcpy Wrapper
+void Strcpy(char* dest, unsigned int size, const char* src);
+
 /* Handler di CTRL+C */
 #ifdef __linux__
 void my_handler(int s);
