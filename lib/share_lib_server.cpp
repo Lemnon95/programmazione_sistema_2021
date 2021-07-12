@@ -350,6 +350,8 @@ void SharedLibServer::spawnSockets() {
     InitializeCriticalSection(&CritSec);
 #endif
 
+    // TODO: fixare recv non blocking
+
     /*
     PF_INET = Internet Protocol (IP)
     SOCK_STREAM = TPC/IP
@@ -498,17 +500,18 @@ void* Accept(void* rank) {
 
         // passo 1
         Strcpy(_t, 1024, Recv(socket_descriptor));
-        if (_t != "HELO") {
+
+        if (strncmp(_t, "HELO", 4) != 0) {
             closesocket(socket_descriptor);
             continue;
         }
-
+        
         memset(_t, '\0', 1024);
 
         // passo 2,3,4
         // TODO: sostituire 0 con T_s
         unsigned long int nonce = rand() % 2147483647;
-        unsigned long int challenge = 0 ^ nonce;
+        unsigned long int challenge = 145297 ^ nonce;
         snprintf(_t, 1024, "%lu", challenge);
         
         char _auth[1024] = {0};
@@ -517,6 +520,8 @@ void* Accept(void* rank) {
         #else //linux
         strcpy(_auth, Send_Recv(socket_descriptor, _t, "300"));
         #endif
+
+        printf("\nauth ottenuto: %s\n",_auth);
 
         // passo 5
         char _command[1024] = { 0 };
@@ -528,7 +533,7 @@ void* Accept(void* rank) {
         strcpy(_command, strtok(_auth, " ;"));
         #endif
         
-        if (_command != "AUTH") {
+        if (strncmp(_command, "AUTH", 4) != 0) {
             closesocket(socket_descriptor);
             continue;
         }
@@ -543,7 +548,7 @@ void* Accept(void* rank) {
         #endif
         char* endP;
         // TODO: sostituire 0 con T_s
-        unsigned long int T_c = 0 ^ strtoul(_command, &endP, 10);
+        unsigned long int T_c = 145297 ^ strtoul(_command, &endP, 10);
 
 
         memset(_command, '\0', 1024);
@@ -585,7 +590,7 @@ void Send(SOCKET soc, const char* str) {
 char* Recv(SOCKET soc) {
     char _t[1024] = { 0 };
     if (recv(soc, _t, 1024, 0) < 0) {
-        ShowErr("Errore nel ricevere un messaggio dal server");
+        ShowErr("Errore nel ricevere un messaggio dal client");
     }
     return _t;
 }
@@ -593,7 +598,6 @@ char* Recv(SOCKET soc) {
 char* Send_Recv(SOCKET soc, const char* str, const char* status) {
 
     char _t[1024] = { 0 };
-
     if (status != NULL) {
         Send(soc, status);
         if (errno) {
@@ -703,9 +707,9 @@ void Free(void* arg, int size) {
 // strcpy Wrapper
 void Strcpy(char* dest, unsigned int size, const char* src) {
 
-    if ((sizeof(dest) / sizeof(char)) < size) {
+    /*if ((sizeof(dest) / sizeof(char)) < size) {
         ShowErr("Stringa di destinazione troppo piccola Strcpy");
-    }
+    }*/
 
 #ifdef _WIN32
     strcpy_s(dest, size, src);

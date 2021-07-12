@@ -264,7 +264,7 @@ char* SharedLibClient::Recv() {
     return _t;
 }
 
-char* SharedLibClient::Send_Recv(const char* str=NULL, char* status=NULL) {
+char* SharedLibClient::Send_Recv(const char* str, char* status) {
 
     this->Send(str);
 
@@ -313,7 +313,9 @@ void SharedLibClient::Trasmissione() {
     char status[1024] = {0};
     challenge = strtoul(this->Send_Recv("HELO", status), &endP, 10);
 
-    if (status != "300") {
+
+    if (strncmp(status, "300", 3) != 0) {
+        closesocket(this->socketClient);
         ShowErr("status code invalido");
     }
     memset(status, '\0', 1024);
@@ -332,6 +334,8 @@ void SharedLibClient::Trasmissione() {
     sprintf(authmsg, "AUTH %lu;%lu", enc1,enc2);
     #endif
 
+    printf("\nauth generato: %s\n",authmsg);
+
     // passo 6
     #ifdef _WIN32
     strcpy_s(status, 1024, this->Send_Recv(authmsg));
@@ -345,7 +349,7 @@ void SharedLibClient::Trasmissione() {
     }
     #endif
 
-    if (status != "200") {
+    if (strncmp(status, "200", 3) != 0) {
         ShowErr("Auth errato");
     }
 
