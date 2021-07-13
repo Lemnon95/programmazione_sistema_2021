@@ -11,3 +11,4 @@ run:
 
 clean:
 	rm server
+	rm client
