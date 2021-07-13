@@ -350,8 +350,6 @@ void SharedLibServer::spawnSockets() {
     InitializeCriticalSection(&CritSec);
 #endif
 
-    // TODO: fixare recv non blocking
-
     /*
     PF_INET = Internet Protocol (IP)
     SOCK_STREAM = TPC/IP
@@ -376,12 +374,11 @@ void SharedLibServer::spawnSockets() {
     #endif
 
 
-
     // instanzio i thread nella lista
     for (int q = 0; q < this->parametri.nthread; q++) {
 
     #ifdef _WIN32
-        if ((this->threadChild[q] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), (LPVOID)(&this->T_s), 0, NULL)) == NULL) {
+        if ((this->threadChild[q] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), (LPVOID)(this->T_s), 0, NULL)) == NULL) {
             ShowErr("Impossibile creare un thread");
         }
         
@@ -394,6 +391,7 @@ void SharedLibServer::spawnSockets() {
     #endif
 
     }
+    
 
     // impostazioni base del server
     sockaddr_in masterSettings;
@@ -417,7 +415,7 @@ void SharedLibServer::spawnSockets() {
     char _t[17] = {0};
     inet_ntop(AF_INET, &masterSettings.sin_addr, _t,17);
     printf("\nServer in ascolto su %s:%d\n", _t, masterSettings.sin_port);
-
+    
 }
 
 void SharedLibServer::beginServer() {
@@ -456,13 +454,39 @@ void SharedLibServer::beginServer() {
 
 // Dopo che un thread viene creato esegue questa funzione
 void* Accept(void* rank) {
-
+    // inizializzo rand
     srand(time(NULL));
     
-    int socket_descriptor;
+    SOCKET socket_descriptor;
+
     unsigned long int T_s = (unsigned long int) rank;
+    unsigned long int T_c = 0;
+    unsigned long int nonce = 0;
+    unsigned long int challenge = 0;
+    unsigned long int challenge_nonce = 0;
+
+    char* endP;
+    char* next_tok;
+
+    char _t[1024] = { 0 };
+    char _auth[1024] = { 0 };
+    char _command[1024] = { 0 };
+
     while (1) {
-        //thread goes to sleep
+        // cleanup vars
+        T_c = 0;
+        nonce = 0;
+        challenge = 0;
+        challenge_nonce = 0;
+
+        next_tok = NULL;
+        endP = NULL;
+
+        memset(_t, '\0', 1024);
+        memset(_auth, '\0', 1024);
+        memset(_command, '\0', 1024);
+
+        // i thread vanno a dormire
         #ifdef _WIN32
         EnterCriticalSection(&CritSec);
 
@@ -476,7 +500,7 @@ void* Accept(void* rank) {
         }
         wake_one = true;
         #endif
-        //now I'm awake
+        // sezione critica
 
         Dequeue(&socket_descriptor, &front, &rear);
         #ifdef _WIN32
@@ -484,10 +508,7 @@ void* Accept(void* rank) {
         #else //linux
         pthread_mutex_unlock(&mutex);
         #endif
-
-        //parte parallela
-
-        
+        // sezione parallela
 
         /*
         1. ricevere HELO
@@ -501,52 +522,38 @@ void* Accept(void* rank) {
         */
 
         // passo 1
-        char _t[1024] = { 0 };
-
         Recv(socket_descriptor, _t);
-        printf("\npasso 1 msg: %s\n", _t);
 
         if (strncmp(_t, "HELO", 4) != 0) {
             closesocket(socket_descriptor);
             continue;
         }
-        
         memset(_t, '\0', 1024);
 
         // passo 2,3,4
-        unsigned long int nonce = rand() % 2147483647;
-        unsigned long int challenge = T_s ^ nonce;
-        snprintf(_t, 1024, "%lu", challenge);
+        nonce = rand() % 2147483647; // nonce
+        challenge = T_s ^ nonce; // T_s XOR nonce
+
+        snprintf(_t, 1024, "%lu", challenge); // unsigned long int to string
+
+        Send_Recv(socket_descriptor, _auth, _t, "300"); // invio lo status e challenge, ottengo l'auth
+
         
-        char _auth[1024] = {0};
-        Send_Recv(socket_descriptor, _auth, _t, "300");
-
-
         // passo 5
-        char _command[1024] = { 0 };
-        // AUTH
-        char* next_tok = NULL;
-        Strcpy(_command, 1024, strtok_r(_auth, " ;", &next_tok));
+        Strcpy(_command, 1024, strtok_r(_auth, " ;", &next_tok)); // AUTH
         
         if (strncmp(_command, "AUTH", 4) != 0) {
             closesocket(socket_descriptor);
             continue;
         }
         
-        memset(_command, '\0', 1024);
         // enc1
-        Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok));
+        Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok)); // T_s XOR nonce XOR T_c
+        T_c = T_s ^ nonce ^ strtoul(_command, &endP, 10);
 
-        char* endP;
-        unsigned long int T_c = T_s ^ strtoul(_command, &endP, 10);
-
-
-        memset(_command, '\0', 1024);
-        
         // enc2
-        Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok));
-        
-        unsigned long int challenge_nonce = T_c ^ strtoul(_command, &endP, 10);
+        Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok)); // T_c XOR nonce
+        challenge_nonce = T_c ^ strtoul(_command, &endP, 10);
 
         if (challenge_nonce != nonce) {
             Send(socket_descriptor, "400");
@@ -554,7 +561,7 @@ void* Accept(void* rank) {
             printf("\nClient Rifiutato\n");
             continue;
         }
-        Send(socket_descriptor, "200");
+        Send(socket_descriptor, "200"); // nonce accettato
 
         printf("\nClient Accettato\n");
 
@@ -579,33 +586,26 @@ void Send(SOCKET soc, const char* str) {
 }
 
 void Recv(SOCKET soc, char* _return) {
-    char _t[1024] = { 0 };
+    char* _t = (char*)Calloc(1024, sizeof(char));
     if (recv(soc, _t, 1024, 0) < 0) {
         ShowErr("Errore nel ricevere un messaggio dal client");
     }
 
     Strcpy(_return, 1024, _t);
-    
+    Free(_t, 1024);
 }
 
 void Send_Recv(SOCKET soc, char* _return, const char* str, const char* status) {
 
-    char _t[1024] = { 0 };
     if (status != NULL) {
         Send(soc, status);
-        if (errno) {
-            ShowErr("errore nel salvare il messaggio del server");
-        }
     }
     
     if (str != NULL) {
         Send(soc, str);
-        if (errno) {
-            ShowErr("errore nel salvare il messaggio del server");
-        }
     }
     
-    Recv(soc,_return);
+    Recv(soc, _return);
 
 }
 
@@ -688,6 +688,10 @@ void Free(void* arg, int size) {
         ShowErr("variabile data a Free() è NULL\n");
     }
 
+    if (size == 0) {
+        ShowErr("Free(_, 0) impossibile svuotare variabile di lunghezza 0");
+    }
+
     memset(arg, '\0', size);
     free(arg);
 
@@ -695,7 +699,7 @@ void Free(void* arg, int size) {
 
 // strcpy Wrapper
 void Strcpy(char* dest, unsigned int size, const char* src) {
-
+    memset(dest, '\0', 1024);
 #ifdef _WIN32
     strcpy_s(dest, size, src);
     if (errno) {

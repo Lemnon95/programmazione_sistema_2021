@@ -258,31 +258,24 @@ void SharedLibClient::Send(const char* str) {
     }
 }
 
-char* SharedLibClient::Recv() {
+void SharedLibClient::Recv(char* _return) {
     char _t[1024] = { 0 };
     if (recv(this->socketClient, _t, 1024, 0) < 0) {
         ShowErr("Errore nel ricevere un messaggio dal server");
     }
-    return _t;
+
+    Strcpy(_return, 1024, _t);
 }
 
-char* SharedLibClient::Send_Recv(const char* str, char* status) {
+void SharedLibClient::Send_Recv(char* _return, const char* str, char* status) {
     
     this->Send(str);
 
-    char _t[1024] = {0};
     if (status != NULL) {
-        Strcpy(status, 1024, this->Recv());
-        if (errno) {
-            ShowErr("errore nel salvare il messaggio del server");
-        }
-    }
-    Strcpy(_t, 1024, this->Recv());
-    if (errno) {
-        ShowErr("errore nel salvare il messaggio del server");
+        this->Recv(status);
     }
 
-    return _t;
+    this->Recv(_return);
 }
 
 void SharedLibClient::Trasmissione() {
@@ -291,6 +284,12 @@ void SharedLibClient::Trasmissione() {
     unsigned long int enc1 = 0;
     unsigned long int enc2 = 0;
     unsigned long int nonce = 0;
+
+    char* endP;
+    char status[1024] = { 0 };
+    char _t[1024] = { 0 };
+    char authmsg[1024] = { 0 };
+
     /*
     1. invio HELO
     2. ricevo la challenge
@@ -302,9 +301,8 @@ void SharedLibClient::Trasmissione() {
     */
 
     // passo 1,2
-    char* endP;
-    char status[1024] = {0};
-    challenge = strtoul(this->Send_Recv("HELO", status), &endP, 10);
+    this->Send_Recv(_t, "HELO", status);
+    challenge = strtoul(_t, &endP, 10);
 
 
     if (strncmp(status, "300", 3) != 0) {
@@ -314,28 +312,22 @@ void SharedLibClient::Trasmissione() {
     memset(status, '\0', 1024);
 
     // passo 3
-    // XOR tra la challenge ottenuta e la giusta chiave data in input
-    nonce = challenge ^ this->T_s;
+    nonce = challenge ^ this->T_s; // risolvo la challenge
 
     // passo 4,5
-    char authmsg[1024] = {0};
-    enc1 = this->T_s ^ this->T_c;
+    enc1 = this->T_s ^ nonce ^ this->T_c;
     enc2 = this->T_c ^ nonce;
 
-    snprintf(authmsg, 1024, "AUTH %lu;%lu", enc1, enc2);
+    snprintf(authmsg, 1024, "AUTH %lu;%lu", enc1, enc2); // compongo AUTH enc1;enc2
 
     // passo 6
-    Strcpy(status, 1024, this->Send_Recv(authmsg));
-    if (errno) {
-        ShowErr("errore nel ottenere lo stato dopo auth");
-    }
-
+    this->Send_Recv(status, authmsg);
+    
     if (strncmp(status, "200", 3) != 0) {
         ShowErr("Auth errato");
     }
 
     printf("\nConnessione OK\n");
-
 }
 
 void SharedLibClient::clearSocket() {

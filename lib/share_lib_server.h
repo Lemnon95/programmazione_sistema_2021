@@ -120,9 +120,9 @@ void Recv(SOCKET soc, char* _return);
 void Send_Recv(SOCKET soc, char* _return, const char* str = NULL, const char* status = NULL);
 
 
-void Enqueue(int socket_descriptor, struct queue** front, struct queue** rear);
+void Enqueue(SOCKET socket_descriptor, struct queue** front, struct queue** rear);
 
-int Dequeue(int* socket_descriptor, struct queue** front, struct queue** rear);
+int Dequeue(SOCKET* socket_descriptor, struct queue** front, struct queue** rear);
 
 
 // calloc Wrapper

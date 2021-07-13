@@ -208,7 +208,7 @@ Il protocollo di autenticazione prevede i seguenti passi:
 	3. Il client estrae la challenge
 		utilizzando il valore di T_s che ha calcolato in primis 
 		Invia poi al server un messaggio AUTH <enc1;enc2> dove:
-		: enc1_c=(T_s 	XOR T_c_i ) 
+		: enc1_c=(T_s 	XOR challenge XOR T_c_i ) 
 		: enc2_c=(T_c_i XOR challenge)
 
 	4. Il server 
