@@ -42,6 +42,8 @@ inline pthread_mutex_t mutex;
 inline pthread_cond_t cond_var;
 inline pthread_t* threadChild = NULL;
 inline bool wake_one = true;
+inline bool esci = false;
+inline int chiusura = 0;
 // alias di WinSock per la chiusura del socket
 #define closesocket close
 #define SOCKET int

@@ -381,17 +381,17 @@ void SharedLibServer::spawnSockets() {
         if ((this->threadChild[q] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), (LPVOID)(this->T_s), 0, NULL)) == NULL) {
             ShowErr("Impossibile creare un thread");
         }
-        
+
     #else // linux
       pthread_mutex_init(&mutex, NULL);
       pthread_cond_init(&cond_var, NULL);
       // TODO: ricordarsi di fare il destroy
-      if (pthread_create(&threadChild[(long)q], NULL, Accept, (void*) (long)q) != 0)
+      if (pthread_create(&threadChild[(long)q], NULL, Accept, (void*)this->T_s) != 0)
             printf("Failed to create thread\n");
     #endif
 
     }
-    
+
 
     // impostazioni base del server
     sockaddr_in masterSettings;
@@ -415,7 +415,7 @@ void SharedLibServer::spawnSockets() {
     char _t[17] = {0};
     inet_ntop(AF_INET, &masterSettings.sin_addr, _t,17);
     printf("\nServer in ascolto su %s:%d\n", _t, masterSettings.sin_port);
-    
+
 }
 
 void SharedLibServer::beginServer() {
@@ -428,6 +428,8 @@ void SharedLibServer::beginServer() {
         addr_size = sizeof(this->socketChild);
         // bloccante
         newSocket = accept(this->socketMaster, (sockaddr*)&(this->socketChild), &addr_size);
+        if (newSocket == -1)
+          break;
         Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
 
         printf("\nConnessione in entrata\n");
@@ -446,6 +448,7 @@ void SharedLibServer::beginServer() {
         #endif // _WIN32
 
     }
+    closesocket(this->socketMaster);
 }
 
 
@@ -454,9 +457,15 @@ void SharedLibServer::beginServer() {
 
 // Dopo che un thread viene creato esegue questa funzione
 void* Accept(void* rank) {
+    #ifdef __linux__
+    sigset_t sigset;
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGHUP);
+    pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
+    #endif
     // inizializzo rand
     srand(time(NULL));
-    
+
     SOCKET socket_descriptor;
 
     unsigned long int T_s = (unsigned long int) rank;
@@ -497,6 +506,14 @@ void* Accept(void* rank) {
         pthread_mutex_lock(&mutex);
         while (wake_one) {
           pthread_cond_wait(&cond_var, &mutex);
+          if (esci) {
+            chiusura++;
+            pid_t x = syscall(__NR_gettid);
+            printf("Exit Thread number: %d\n", x);
+            pthread_cond_signal(&cond_var);
+            pthread_mutex_unlock(&mutex);
+            return NULL;
+          }
         }
         wake_one = true;
         #endif
@@ -538,15 +555,15 @@ void* Accept(void* rank) {
 
         Send_Recv(socket_descriptor, _auth, _t, "300"); // invio lo status e challenge, ottengo l'auth
 
-        
+
         // passo 5
         Strcpy(_command, 1024, strtok_r(_auth, " ;", &next_tok)); // AUTH
-        
+
         if (strncmp(_command, "AUTH", 4) != 0) {
             closesocket(socket_descriptor);
             continue;
         }
-        
+
         // enc1
         Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok)); // T_s XOR nonce XOR T_c
         T_c = T_s ^ nonce ^ strtoul(_command, &endP, 10);
@@ -600,11 +617,11 @@ void Send_Recv(SOCKET soc, char* _return, const char* str, const char* status) {
     if (status != NULL) {
         Send(soc, status);
     }
-    
+
     if (str != NULL) {
         Send(soc, str);
     }
-    
+
     Recv(soc, _return);
 
 }
@@ -634,7 +651,7 @@ void Enqueue(SOCKET socket_descriptor, Queue** front, Queue** rear) {
 }
 
 int Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear) {
-    
+
     if (size == 0) {
         return -1;
     }
@@ -699,7 +716,7 @@ void Free(void* arg, int size) {
 
 // strcpy Wrapper
 void Strcpy(char* dest, unsigned int size, const char* src) {
-    memset(dest, '\0', 1024);
+    memset(dest, '\0', size);
 #ifdef _WIN32
     strcpy_s(dest, size, src);
     if (errno) {
