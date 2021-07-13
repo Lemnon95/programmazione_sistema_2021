@@ -27,7 +27,7 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     Free(_Tpath, MAX_PATH + 1);
     #else
     //_path = (char*)Calloc(sizeof("/tmp/server.log")+1,sizeof(char)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
-    Strcpy(_path, "/tmp/server.log", 1024);
+    Strcpy(_path, MAX_PATH, "/tmp/server.log");
     #endif // _WIN32
 
     // parametri di default
@@ -485,7 +485,7 @@ void* Accept(void* rank) {
 
         //parte parallela
 
-        char _t[1024] = { 0 };
+        
 
         /*
         1. ricevere HELO
@@ -499,6 +499,7 @@ void* Accept(void* rank) {
         */
 
         // passo 1
+        char _t[1024] = { 0 };
         Strcpy(_t, 1024, Recv(socket_descriptor));
 
         if (strncmp(_t, "HELO", 4) != 0) {
@@ -509,7 +510,7 @@ void* Accept(void* rank) {
         memset(_t, '\0', 1024);
 
         // passo 2,3,4
-        // TODO: sostituire 0 con T_s
+        // TODO: sostituire 145297 con T_s
         unsigned long int nonce = rand() % 2147483647;
         unsigned long int challenge = 145297 ^ nonce;
         snprintf(_t, 1024, "%lu", challenge);
@@ -549,9 +550,12 @@ void* Accept(void* rank) {
         if ((T_c ^ strtoul(_command, &endP, 10)) != nonce) {
             Send(socket_descriptor, "400");
             closesocket(socket_descriptor);
+            printf("\nClient Rifiutato\n");
             continue;
         }
         Send(socket_descriptor, "200");
+
+        printf("\nClient Accettato\n");
 
         // passo 6
         // TODO: print to log

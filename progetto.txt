@@ -201,8 +201,8 @@ Il protocollo di autenticazione prevede i seguenti passi:
 	2. il server risponde con un codice di risposta 300
 		invia poi un unsigned long int che contiene la challenge.
 		Il valore che viene inviato dal server è calcolato effettuando:
-			nonce = T_s XOR challenge
-				La challenge è un unsigned long int scelto random dal server (nonce)
+			challenge = T_s XOR nonce
+				La nonce è un unsigned long int scelto random dal server
 
 
 	3. Il client estrae la challenge

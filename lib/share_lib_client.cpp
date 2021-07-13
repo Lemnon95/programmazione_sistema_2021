@@ -168,6 +168,8 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
     this->T_c = this->generateToken("Immetti passphrase del client (max 254): ");
 
+    printf("\nT_s: %lu\nT_c: %lu\n",this->T_s,this->T_c);
+
 }
 
 SharedLibClient::~SharedLibClient() {
@@ -288,6 +290,7 @@ void SharedLibClient::Trasmissione() {
     unsigned long int challenge = 0;
     unsigned long int enc1 = 0;
     unsigned long int enc2 = 0;
+    unsigned long int nonce = 0;
     /*
     1. invio HELO
     2. ricevo la challenge
@@ -312,19 +315,14 @@ void SharedLibClient::Trasmissione() {
 
     // passo 3
     // XOR tra la challenge ottenuta e la giusta chiave data in input
-    challenge = challenge ^ this->T_s;
+    nonce = challenge ^ this->T_s;
 
     // passo 4,5
     char authmsg[1024] = {0};
     enc1 = this->T_s ^ this->T_c;
-    enc2 = this->T_c ^ challenge;
-    #ifdef _WIN32
-    sprintf_s(authmsg, 1024, "AUTH %lu;%lu", enc1,enc2);
-    #else //_linux_
-    sprintf(authmsg, "AUTH %lu;%lu", enc1,enc2);
-    #endif
+    enc2 = this->T_c ^ nonce;
 
-    printf("\nauth generato: %s\n",authmsg);
+    snprintf(authmsg, 1024, "AUTH %lu;%lu", enc1, enc2);
 
     // passo 6
     Strcpy(status, 1024, this->Send_Recv(authmsg));
@@ -335,6 +333,8 @@ void SharedLibClient::Trasmissione() {
     if (strncmp(status, "200", 3) != 0) {
         ShowErr("Auth errato");
     }
+
+    printf("\nConnessione OK\n");
 
 }
 
