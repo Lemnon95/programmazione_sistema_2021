@@ -44,7 +44,7 @@ inline pthread_t* threadChild = NULL;
 inline bool wake_one = true;
 // alias di WinSock per la chiusura del socket
 #define closesocket close
-
+#define SOCKET int
 // typedef definite in Windows.h
 typedef wchar_t WCHAR;
 #endif //_WIN32
@@ -93,9 +93,9 @@ private:
 	params parametri;
 	unsigned long int T_s = 0;
 	FILE* FileDescLog = NULL;
-	int socketMaster = 0;
+	SOCKET socketMaster = 0;
 	#ifdef _WIN32
-	int* threadChild = NULL;
+	void** threadChild = NULL;
 	#endif //WIN32
 	struct sockaddr_storage socketChild;
 

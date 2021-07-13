@@ -269,23 +269,13 @@ char* SharedLibClient::Send_Recv(const char* str, char* status) {
     this->Send(str);
 
     char _t[1024] = {0};
-    #ifdef _WIN32
     if (status != NULL) {
-        strcpy_s(status, 1024, this->Recv());
+        Strcpy(status, 1024, this->Recv());
         if (errno) {
             ShowErr("errore nel salvare il messaggio del server");
         }
     }
-    strcpy_s(_t, 1024, this->Recv());
-    #else //linux
-    if (status != NULL) {
-        strcpy(status, this->Recv());
-        if (errno) {
-            ShowErr("errore nel salvare il messaggio del server");
-        }
-    }
-    strcpy(_t, this->Recv());
-    #endif
+    Strcpy(_t, 1024, this->Recv());
     if (errno) {
         ShowErr("errore nel salvare il messaggio del server");
     }
@@ -337,17 +327,10 @@ void SharedLibClient::Trasmissione() {
     printf("\nauth generato: %s\n",authmsg);
 
     // passo 6
-    #ifdef _WIN32
-    strcpy_s(status, 1024, this->Send_Recv(authmsg));
+    Strcpy(status, 1024, this->Send_Recv(authmsg));
     if (errno) {
         ShowErr("errore nel ottenere lo stato dopo auth");
     }
-    #else //linux
-    strcpy(status, this->Send_Recv(authmsg));
-    if (errno) {
-        ShowErr("errore nel ottenere lo stato dopo auth");
-    }
-    #endif
 
     if (strncmp(status, "200", 3) != 0) {
         ShowErr("Auth errato");
@@ -417,5 +400,19 @@ void Free(void* arg, int size) {
 
     memset(arg, '\0', size);
     free(arg);
+
+}
+
+// strcpy Wrapper
+void Strcpy(char* dest, unsigned int size, const char* src) {
+
+#ifdef _WIN32
+    strcpy_s(dest, size, src);
+    if (errno) {
+        ShowErr("Errore nel copiare una stringa");
+    }
+#else //linux
+    strncpy(dest, src, size);
+#endif
 
 }

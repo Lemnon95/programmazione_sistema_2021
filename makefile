@@ -8,3 +8,6 @@ compile:
 
 run:
 	./server
+
+clean:
+	rm server

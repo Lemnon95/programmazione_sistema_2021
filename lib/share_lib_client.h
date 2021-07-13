@@ -21,9 +21,10 @@
 
 // alias di WinSock per la chiusura del socket
 #define closesocket close
-
+#define SOCKET int
 // typedef definite in Windows.h
 typedef wchar_t WCHAR;
+
 #endif // _WIN32
 
 #define MAX_PATH 260
@@ -54,7 +55,7 @@ private:
 	params parametri;
 	unsigned long int T_s = 0;
 	unsigned long int T_c = 0;
-	int socketClient = 0;
+	SOCKET socketClient = 0;
 
 	void getPassphrase(const char* printText, char* passphrase);
 	unsigned long int generateToken(const char* printText);
@@ -72,3 +73,5 @@ void* Calloc(unsigned long int nmemb, unsigned long int size);
 void ShowErr(const char* str);
 // free Wrapper
 void Free(void* arg, int size);
+// strcpy Wrapper
+void Strcpy(char* dest, unsigned int size, const char* src);

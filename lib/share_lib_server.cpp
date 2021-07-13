@@ -284,7 +284,7 @@ void SharedLibServer::clearSocket() {
     // chiudi i socket in ascolto
     for (int i = 0; i < this->parametri.nthread; i++) {
       #ifdef _WIN32
-        closesocket(this->threadChild[i]);
+        closesocket((SOCKET)this->threadChild[i]);
       #else //_linux_
         closesocket(threadChild[i]);
       #endif
@@ -370,7 +370,7 @@ void SharedLibServer::spawnSockets() {
 
     // crea figli
     #ifdef _WIN32
-    this->threadChild = (int*)Calloc(this->parametri.nthread, sizeof(int));
+    this->threadChild = (void**)Calloc(this->parametri.nthread, sizeof(void *));
     #else
     threadChild = (pthread_t*)Calloc(this->parametri.nthread, sizeof(pthread_t));
     #endif
@@ -379,10 +379,10 @@ void SharedLibServer::spawnSockets() {
     for (int q = 0; q < this->parametri.nthread; q++) {
 
     #ifdef _WIN32
-        if ((this->threadChild[q] = (int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL)) == NULL) {
+        if ((this->threadChild[q] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL)) == NULL) {
             ShowErr("Impossibile creare un thread");
         }
-
+        
     #else // linux
       pthread_mutex_init(&mutex, NULL);
       pthread_cond_init(&cond_var, NULL);
@@ -421,13 +421,13 @@ void SharedLibServer::spawnSockets() {
 void SharedLibServer::beginServer() {
 
     socklen_t addr_size;
-    int newSocket = 0;
+    SOCKET newSocket = 0;
 
     while (1) {
         //Accept call creates a new socket for the incoming connection
         addr_size = sizeof(this->socketChild);
         // bloccante
-        newSocket = accept(this->socketMaster, (struct sockaddr*)&(this->socketChild), &addr_size);
+        newSocket = accept(this->socketMaster, (sockaddr*)&(this->socketChild), &addr_size);
         Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
 
         printf("\nConnessione in entrata\n");
@@ -456,7 +456,7 @@ void SharedLibServer::beginServer() {
 void* Accept(void* rank) {
 
     srand(time(NULL));
-
+    
     int socket_descriptor;
     long my_rank = (long) rank;
     while (1) {
@@ -515,23 +515,17 @@ void* Accept(void* rank) {
         snprintf(_t, 1024, "%lu", challenge);
         
         char _auth[1024] = {0};
-        #ifdef WIN32
-        strcpy_s(_auth, 1024, Send_Recv(socket_descriptor, _t, "300"));
-        #else //linux
-        strcpy(_auth, Send_Recv(socket_descriptor, _t, "300"));
-        #endif
+
+        Strcpy(_auth, 1024, Send_Recv(socket_descriptor, _t, "300"));
+
 
         printf("\nauth ottenuto: %s\n",_auth);
 
         // passo 5
         char _command[1024] = { 0 };
         // AUTH
-        #ifdef WIN32
         char* next_tok = NULL;
-        strcpy_s(_command, 1024, strtok_s(_auth, " ;", &next_tok));
-        #else //linux
-        strcpy(_command, strtok(_auth, " ;"));
-        #endif
+        Strcpy(_command, 1024, strtok_r(_auth, " ;", &next_tok));
         
         if (strncmp(_command, "AUTH", 4) != 0) {
             closesocket(socket_descriptor);
@@ -540,26 +534,18 @@ void* Accept(void* rank) {
         
         memset(_command, '\0', 1024);
         
-        // enc1
-        #ifdef WIN32
-        strcpy_s(_command, 1024, strtok_s(NULL, " ;", &next_tok));
-        #else //linux
-        strcpy(_command, strtok(NULL, " ;"));
-        #endif
+        Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok));
+
         char* endP;
-        // TODO: sostituire 0 con T_s
+        // TODO: sostituire 145297 con T_s
         unsigned long int T_c = 145297 ^ strtoul(_command, &endP, 10);
 
 
         memset(_command, '\0', 1024);
-
+        
         // enc2
-        #ifdef WIN32
-        strcpy_s(_command, 1024, strtok_s(NULL, " ;", &next_tok));
-        #else //linux
-        strcpy(_command, strtok(NULL, " ;"));
-        #endif
-
+        Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok));
+        
         if ((T_c ^ strtoul(_command, &endP, 10)) != nonce) {
             Send(socket_descriptor, "400");
             closesocket(socket_descriptor);
@@ -706,10 +692,6 @@ void Free(void* arg, int size) {
 
 // strcpy Wrapper
 void Strcpy(char* dest, unsigned int size, const char* src) {
-
-    /*if ((sizeof(dest) / sizeof(char)) < size) {
-        ShowErr("Stringa di destinazione troppo piccola Strcpy");
-    }*/
 
 #ifdef _WIN32
     strcpy_s(dest, size, src);
