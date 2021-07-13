@@ -22,8 +22,6 @@
 // alias di WinSock per la chiusura del socket
 #define closesocket close
 #define SOCKET int
-// typedef definite in Windows.h
-typedef wchar_t WCHAR;
 
 #endif // _WIN32
 
