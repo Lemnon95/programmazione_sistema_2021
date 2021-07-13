@@ -52,13 +52,13 @@ inline bool wake_one = true;
 // definizione della coda
 // la struttura conterrà i socket delle connessioni accettate
 typedef struct queue {
-	int socket_descriptor;
+	SOCKET socket_descriptor;
 	struct queue* link;
 } Queue;
 
 inline Queue* front;
 inline Queue* rear;
-int inline size = 0; //queue size
+inline int size = 0; //queue size
 
 
 
@@ -111,14 +111,18 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-void Enqueue(int socket_descriptor, struct queue** front, struct queue** rear);
-
-int Dequeue(int* socket_descriptor, struct queue** front, struct queue** rear);
+// thread function
+void* Accept(void* rank);
 
 // send-recv Wrapper
 void Send(SOCKET soc, const char* str);
-char* Recv(SOCKET soc);
-char* Send_Recv(SOCKET soc, const char* str = NULL, const char* status = NULL);
+void Recv(SOCKET soc, char* _return);
+void Send_Recv(SOCKET soc, char* _return, const char* str = NULL, const char* status = NULL);
+
+
+void Enqueue(int socket_descriptor, struct queue** front, struct queue** rear);
+
+int Dequeue(int* socket_descriptor, struct queue** front, struct queue** rear);
 
 
 // calloc Wrapper
@@ -127,8 +131,6 @@ void* Calloc(unsigned long int nmemb, unsigned long int size);
 void ShowErr(const char* str);
 // free Wrapper
 void Free(void * arg, int size);
-// thread function
-void* Accept(void* rank);
 // strcpy Wrapper
 void Strcpy(char* dest, unsigned int size, const char* src);
 

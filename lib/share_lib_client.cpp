@@ -267,7 +267,7 @@ char* SharedLibClient::Recv() {
 }
 
 char* SharedLibClient::Send_Recv(const char* str, char* status) {
-
+    
     this->Send(str);
 
     char _t[1024] = {0};

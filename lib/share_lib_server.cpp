@@ -375,11 +375,13 @@ void SharedLibServer::spawnSockets() {
     threadChild = (pthread_t*)Calloc(this->parametri.nthread, sizeof(pthread_t));
     #endif
 
+
+
     // instanzio i thread nella lista
     for (int q = 0; q < this->parametri.nthread; q++) {
 
     #ifdef _WIN32
-        if ((this->threadChild[q] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), NULL, 0, NULL)) == NULL) {
+        if ((this->threadChild[q] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), (LPVOID)(&this->T_s), 0, NULL)) == NULL) {
             ShowErr("Impossibile creare un thread");
         }
         
@@ -458,7 +460,7 @@ void* Accept(void* rank) {
     srand(time(NULL));
     
     int socket_descriptor;
-    long my_rank = (long) rank;
+    unsigned long int T_s = (unsigned long int) rank;
     while (1) {
         //thread goes to sleep
         #ifdef _WIN32
@@ -500,7 +502,9 @@ void* Accept(void* rank) {
 
         // passo 1
         char _t[1024] = { 0 };
-        Strcpy(_t, 1024, Recv(socket_descriptor));
+
+        Recv(socket_descriptor, _t);
+        printf("\npasso 1 msg: %s\n", _t);
 
         if (strncmp(_t, "HELO", 4) != 0) {
             closesocket(socket_descriptor);
@@ -510,17 +514,13 @@ void* Accept(void* rank) {
         memset(_t, '\0', 1024);
 
         // passo 2,3,4
-        // TODO: sostituire 145297 con T_s
         unsigned long int nonce = rand() % 2147483647;
-        unsigned long int challenge = 145297 ^ nonce;
+        unsigned long int challenge = T_s ^ nonce;
         snprintf(_t, 1024, "%lu", challenge);
         
         char _auth[1024] = {0};
+        Send_Recv(socket_descriptor, _auth, _t, "300");
 
-        Strcpy(_auth, 1024, Send_Recv(socket_descriptor, _t, "300"));
-
-
-        printf("\nauth ottenuto: %s\n",_auth);
 
         // passo 5
         char _command[1024] = { 0 };
@@ -534,12 +534,11 @@ void* Accept(void* rank) {
         }
         
         memset(_command, '\0', 1024);
-        
+        // enc1
         Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok));
 
         char* endP;
-        // TODO: sostituire 145297 con T_s
-        unsigned long int T_c = 145297 ^ strtoul(_command, &endP, 10);
+        unsigned long int T_c = T_s ^ strtoul(_command, &endP, 10);
 
 
         memset(_command, '\0', 1024);
@@ -547,7 +546,9 @@ void* Accept(void* rank) {
         // enc2
         Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok));
         
-        if ((T_c ^ strtoul(_command, &endP, 10)) != nonce) {
+        unsigned long int challenge_nonce = T_c ^ strtoul(_command, &endP, 10);
+
+        if (challenge_nonce != nonce) {
             Send(socket_descriptor, "400");
             closesocket(socket_descriptor);
             printf("\nClient Rifiutato\n");
@@ -577,15 +578,17 @@ void Send(SOCKET soc, const char* str) {
     }
 }
 
-char* Recv(SOCKET soc) {
+void Recv(SOCKET soc, char* _return) {
     char _t[1024] = { 0 };
     if (recv(soc, _t, 1024, 0) < 0) {
         ShowErr("Errore nel ricevere un messaggio dal client");
     }
-    return _t;
+
+    Strcpy(_return, 1024, _t);
+    
 }
 
-char* Send_Recv(SOCKET soc, const char* str, const char* status) {
+void Send_Recv(SOCKET soc, char* _return, const char* str, const char* status) {
 
     char _t[1024] = { 0 };
     if (status != NULL) {
@@ -602,24 +605,19 @@ char* Send_Recv(SOCKET soc, const char* str, const char* status) {
         }
     }
     
-    #ifdef _WIN32
-    strcpy_s(_t, 1024, Recv(soc));
-    #else //linux
-    strcpy(_t, Recv(soc));
-    #endif
-    if (errno) {
-        ShowErr("errore nel salvare il messaggio del server");
-    }
-    
-    return _t;
+    Recv(soc,_return);
+
 }
 
 
 // funzioni per gestire la pila di socket
-void Enqueue(int socket_descriptor, struct queue** front, struct queue** rear) {
-    Queue* task = NULL;
+void Enqueue(SOCKET socket_descriptor, Queue** front, Queue** rear) {
+    Queue* task = (Queue*)malloc(1 * sizeof(Queue));
 
-    task = (struct queue*)malloc(sizeof(struct queue));
+    if (task == NULL) {
+        ShowErr("impossibile allocare coda Enqueue");
+    }
+
     task->socket_descriptor = socket_descriptor;
     task->link = NULL;
     if ((*rear)) {
@@ -635,12 +633,13 @@ void Enqueue(int socket_descriptor, struct queue** front, struct queue** rear) {
     size++;
 }
 
-int Dequeue(int* socket_descriptor, struct queue** front, struct queue** rear) {
-    Queue* temp = NULL;
+int Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear) {
+    
     if (size == 0) {
         return -1;
     }
-    temp = *front;
+    Queue* temp = *front;
+
     *socket_descriptor = temp->socket_descriptor;
 
     *front = (*front)->link;
