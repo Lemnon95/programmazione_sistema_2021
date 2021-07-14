@@ -505,9 +505,7 @@ void* Accept(void* rank) {
         // i thread vanno a dormire
         #ifdef _WIN32
         EnterCriticalSection(&CritSec);
-
-        printf("thread id: %lu\n", GetCurrentThreadId());
-
+        //printf("thread id: %lu\n", GetCurrentThreadId());
         SleepConditionVariableCS(&Threadwait, &CritSec, INFINITE);
         #else //linux
         pthread_mutex_lock(&mutex);
@@ -667,6 +665,10 @@ int Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear) {
     *socket_descriptor = temp->socket_descriptor;
 
     *front = (*front)->link;
+    if (*front == NULL) {
+        *rear = *front;
+    }
+
 
     size--;
     free(temp);
