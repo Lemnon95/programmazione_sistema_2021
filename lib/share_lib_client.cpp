@@ -213,7 +213,7 @@ void SharedLibClient::Connect() {
 }
 
 void SharedLibClient::getPassphrase(const char* printText, char* passphrase) {
-    printf(printText);
+    printf("%s",printText);
     fgets(passphrase, 254, stdin);
 }
 

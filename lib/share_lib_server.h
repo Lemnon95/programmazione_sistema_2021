@@ -99,7 +99,7 @@ void SharedLibServer(int argc, char* argv[]);
 void CloseServer();
 void parseConfig();
 
-unsigned long int getToken_s();
+void getToken_s();
 void getPassphrase(char* passphrase);
 unsigned long int generateToken();
 unsigned long int hashToken(char* token);

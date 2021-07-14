@@ -3,8 +3,9 @@
 // funzione init
 void SharedLibServer(int argc, char* argv[]) {
 
-    char* _path = NULL;
-    _path = (char*)Calloc(MAX_PATH + 1, sizeof(char));
+    unsigned long long maxArg = argc;
+    char* _path = (char*)Calloc(MAX_PATH + 1, sizeof(char));
+    
     // trova il percorso temp
     #ifdef _WIN32
     WCHAR* _Tpath = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR));
@@ -33,13 +34,12 @@ void SharedLibServer(int argc, char* argv[]) {
     parametri = { 8888, 10, NULL, false, _path };
 
     // parsing argomenti
-    unsigned long long maxArg = argc;
     while (argc > 0) {
 
         argc -= 1;
-
+        
         // -p <port>
-        if (strcmp(argv[argc], "-p") == 0) {
+        if (strncmp(argv[argc], "-p", 2) == 0) {
 
             if (argc + 1 >= maxArg) {
                 ShowErr("parametro -p incompleto");
@@ -64,7 +64,7 @@ void SharedLibServer(int argc, char* argv[]) {
         }
 
         // -n <num>
-        if (strcmp(argv[argc], "-n") == 0) {
+        if (strncmp(argv[argc], "-n", 2) == 0) {
 
             if (argc + 1 >= maxArg) {
                 ShowErr("parametro -n incompleto");
@@ -88,7 +88,7 @@ void SharedLibServer(int argc, char* argv[]) {
         }
 
         // -c <path>
-        if (strcmp(argv[argc], "-c") == 0) {
+        if (strncmp(argv[argc], "-c", 2) == 0) {
 
             if (argc + 1 >= maxArg) {
                 ShowErr("parametro -c incompleto");
@@ -105,12 +105,12 @@ void SharedLibServer(int argc, char* argv[]) {
         }
 
         // -s
-        if (strcmp(argv[argc], "-s") == 0) {
+        if (strncmp(argv[argc], "-s", 2) == 0) {
             parametri.printToken = true;
         }
 
         // -l <path>
-        if (strcmp(argv[argc], "-l") == 0) {
+        if (strncmp(argv[argc], "-l", 2) == 0) {
 
             if (argc + 1 >= maxArg) {
                 ShowErr("parametro -l incompleto");
@@ -150,7 +150,7 @@ void SharedLibServer(int argc, char* argv[]) {
         parametri.printToken);
 
 }
-// distruttore classe
+
 void CloseServer() {
 
     if(FileDescLog != NULL)
@@ -176,7 +176,7 @@ void parseConfig() {
         }
 
         char line[1024];
-
+        
         // gestione config
         while (fgets(line, 1024, _tConf)) {
 
@@ -242,15 +242,13 @@ void parseConfig() {
 
 //////////////////////////////////////////////////////////////////////////////////
 
-unsigned long int getToken_s() {
+void getToken_s() {
 
     T_s = generateToken();
 
     if (parametri.printToken) {
         printf("\ntoken: %lu\n", T_s);
     }
-
-    return T_s;
 
 }
 
@@ -263,18 +261,19 @@ unsigned long int generateToken() {
 
     char* passphrase = (char*)Calloc(256, sizeof(char));
 
+    // ottieni l'input dell'utente
     getPassphrase(passphrase);
 
+    // hash it
     unsigned long int k = hashToken(passphrase);
 
-    // reset passphrase
+    // clear passphrase
     Free(passphrase, 256);
 
     return k;
 }
 
 unsigned long int hashToken(char* token) {
-
 
     unsigned long int k = 5381;
     // hashing
@@ -292,7 +291,8 @@ unsigned long int hashToken(char* token) {
 //////////////////////////////////////////////////////////////////////////////////
 
 void spawnSockets() {
-#ifdef _WIN32
+    #ifdef _WIN32
+    // Win32 WinSock Init
     WSADATA wsaData;
     int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (iResult != 0) {
@@ -301,27 +301,27 @@ void spawnSockets() {
 
     InitializeConditionVariable(&Threadwait);
     InitializeCriticalSection(&CritSec);
-#endif
+    #endif
 
     /*
     PF_INET = Internet Protocol (IP)
     SOCK_STREAM = TPC/IP
     */
     socketMaster = socket(PF_INET, SOCK_STREAM, 0);
-    if (socketMaster < 0) {
+    if (socketMaster <= 0) {
         clearSocket();
         ShowErr("Errore creazione socket master");
     }
 
-    int _e = true;
-
+    /*int _e = false;
     if (setsockopt(socketMaster, SOL_SOCKET, SO_REUSEADDR, (char*)&_e, sizeof(_e)) < 0) {
         ShowErr("impossibile impostare il socket server");
     }
+    */
 
     // crea figli
     #ifdef _WIN32
-    threadChild = (void**)Calloc(parametri.nthread, sizeof(void *));
+    threadChild = (void**)Calloc(parametri.nthread, sizeof(HANDLE));
     #else
     threadChild = (pthread_t*)Calloc(parametri.nthread, sizeof(pthread_t));
     #endif
@@ -329,20 +329,17 @@ void spawnSockets() {
 
     // instanzio i thread nella lista
     for (int q = 0; q < parametri.nthread; q++) {
-
-    #ifdef _WIN32
+        #ifdef _WIN32
         if ((threadChild[q] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), (LPVOID)(T_s), 0, NULL)) == NULL) {
             ShowErr("Impossibile creare un thread");
         }
-
-    #else // linux
-      pthread_mutex_init(&mutex, NULL);
-      pthread_cond_init(&cond_var, NULL);
-      // TODO: ricordarsi di fare il destroy
-      if (pthread_create(&threadChild[(long)q], NULL, Accept, (void*)T_s) != 0)
+        #else // linux
+        pthread_mutex_init(&mutex, NULL);
+        pthread_cond_init(&cond_var, NULL);
+        // TODO: ricordarsi di fare il destroy
+        if (pthread_create(&threadChild[(long)q], NULL, Accept, (void*)T_s) != 0)
             printf("Failed to create thread\n");
-    #endif
-
+        #endif
     }
 
 
@@ -350,20 +347,19 @@ void spawnSockets() {
     sockaddr_in masterSettings;
     memset(masterSettings.sin_zero, '\0', sizeof(masterSettings.sin_zero));
     masterSettings.sin_family = AF_INET; // protocollo IP
+    masterSettings.sin_port = parametri.port; // Server port
     if (!inet_pton(AF_INET, SERVERLISTEN, &masterSettings.sin_addr)) { // server IP
         ShowErr("non risulta un ip valido");
     }
-    masterSettings.sin_port = parametri.port; // Server port
+    
 
     // apre il server
-    if (bind(socketMaster, (struct sockaddr*)&masterSettings, sizeof(masterSettings)) < 0) {
+    if (bind(socketMaster, (sockaddr*)&masterSettings, sizeof(masterSettings)) < 0) {
         ShowErr("Impossibile aprire il socket del server");
     }
-
     if (listen(socketMaster, parametri.nthread) < 0) {
         ShowErr("Impossibile stare in ascolto sulla porta specificata");
     }
-
 
     char _t[17] = {0};
     inet_ntop(AF_INET, &masterSettings.sin_addr, _t,17);
@@ -379,7 +375,6 @@ void beginServer() {
     while (1) {
         //Accept call creates a new socket for the incoming connection
         addr_size = sizeof(socketChild);
-        // bloccante
         newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
         if (newSocket == -1)
           break;
@@ -432,16 +427,25 @@ void openLog() {
     if (FileDescLog == NULL) {
         // se non è aperto
         // apri il file in modalità Append
-#ifdef _WIN32
-        fopen_s(&(FileDescLog), (char*)(parametri.logPath), "a");
-#else
+        #ifdef _WIN32
+        fopen_s(&FileDescLog, (char*)(parametri.logPath), "a");
+        #else
         FileDescLog = fopen((char*)(parametri.logPath), "a");
-#endif
+        #endif
         // se da errore
         if (errno) {
             ShowErr("errore nell'aprire il file");
         }
     }
+
+}
+
+void writeLog() {
+    if (FileDescLog == NULL) {
+        ShowErr("Impossibile scrivere su log, file non aperto");
+    }
+
+    
 
 }
 
