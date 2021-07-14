@@ -68,8 +68,8 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
                 ShowErr("parametro -l incompleto");
             }
 
-            this->parametri.lst = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
-            this->parametri.lst = argv[argc + 1];
+            this->parametri.lsf = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
+            this->parametri.lsf = argv[argc + 1];
 
         }
 
@@ -84,7 +84,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
                 ShowErr("parametro -e incompleto");
             }
 
-            
+
 
             this->parametri.exec = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
             this->parametri.exec = argv[argc + 1];
@@ -151,10 +151,10 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
     }
 
 
-    printf("\nserver: %d %d\nlst: %s\nexec: %s\ndownload: %s %s\nupload: %s %s\n",
+    printf("\nserver: %d %d\nlsf: %s\nexec: %s\ndownload: %s %s\nupload: %s %s\n",
         this->parametri.server.sin_addr.s_addr,
         this->parametri.server.sin_port,
-        this->parametri.lst,
+        this->parametri.lsf,
         this->parametri.exec,
         this->parametri.download.src,
         this->parametri.download.dest,
@@ -204,10 +204,10 @@ void SharedLibClient::Connect() {
 
     // effettua la connessione ed autenticazione
     this->Trasmissione();
-
     /*
     TODO: inviare e gestire comandi passati come args
     */
+    this->GestioneComandi();
 
     closesocket(this->socketClient);
 }
@@ -268,7 +268,7 @@ void SharedLibClient::Recv(char* _return) {
 }
 
 void SharedLibClient::Send_Recv(char* _return, const char* str, char* status) {
-    
+
     this->Send(str);
 
     if (status != NULL) {
@@ -322,12 +322,51 @@ void SharedLibClient::Trasmissione() {
 
     // passo 6
     this->Send_Recv(status, authmsg);
-    
+
     if (strncmp(status, "200", 3) != 0) {
         ShowErr("Auth errato");
     }
 
     printf("\nConnessione OK\n");
+}
+
+void SharedLibClient::GestioneComandi () {
+  if (this->parametri.lsf != NULL) {
+    this->LSF();
+  }
+}
+
+void SharedLibClient::LSF(){
+  char* ls = (char*)Calloc(1024, sizeof(char));
+  char* status = (char*)Calloc(1024, sizeof(char));
+  char* command = (char*)Calloc(1024, sizeof(char));
+  snprintf(command, 1024, "LSF %s", this->parametri.lsf);
+  this->Send_Recv(status, command);
+  if (strncmp(status, "300", 3) != 0){
+    printf("Errore nell'esecuzione di LSF\n");
+    return;
+  }
+  char* ans = this->ReadAll();
+  printf("Ans is: %s", ans);
+
+}
+
+char* SharedLibClient::ReadAll(){
+  char* buffer_recv = (char*)Calloc(1024, sizeof(char));
+  char* ans = (char*)Calloc(1, sizeof(char));
+  int x = 0;
+  while (true) {
+    this->Recv(buffer_recv);
+    if (strlen(buffer_recv) != 0) {
+      ans = (char*)realloc(ans, (x+1)*1024);
+      memcpy(ans+(x*1024), buffer_recv, 1024);
+      x++;
+    }
+    else {
+      break;
+    }
+  }
+  return ans;
 }
 
 void SharedLibClient::clearSocket() {
@@ -341,9 +380,6 @@ void SharedLibClient::clearSocket() {
     WSACleanup();
 #endif
 }
-
-
-
 
 
 // calloc Wrapper

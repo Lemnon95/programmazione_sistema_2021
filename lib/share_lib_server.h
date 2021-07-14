@@ -12,6 +12,8 @@
 #include <stdbool.h>
 #include <string>
 #include <time.h>
+#include <filesystem>
+#include <iostream>
 
 #ifdef _WIN32
 #define _WINSOCKAPI_
@@ -116,6 +118,9 @@ void closeLog();
 
 // thread function
 void* Accept(void* rank);
+int Autenticazione(SOCKET socket_descriptor);
+void GestioneComandi(SOCKET socket_descriptor);
+void LSF(char* path, SOCKET socket_descriptor);
 
 // send-recv Wrapper
 void Send(SOCKET soc, const char* str);

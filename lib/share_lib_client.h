@@ -30,7 +30,7 @@
 // parametri di configurazione
 struct params {
 	struct sockaddr_in server;
-	char* lst;
+	char* lsf;
 	char* exec;
 	struct download {
 		char* src;
@@ -63,6 +63,9 @@ private:
 	void Send_Recv(char* _return, const char* str = NULL, char* status = NULL);
 	void Trasmissione();
 	void clearSocket();
+	void GestioneComandi();
+	void LSF();
+	char* ReadAll();
 };
 
 // calloc Wrapper

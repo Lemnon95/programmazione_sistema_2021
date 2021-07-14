@@ -5,7 +5,7 @@ void SharedLibServer(int argc, char* argv[]) {
 
     unsigned long long maxArg = argc;
     char* _path = (char*)Calloc(MAX_PATH + 1, sizeof(char));
-    
+
     // trova il percorso temp
     #ifdef _WIN32
     WCHAR* _Tpath = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR));
@@ -37,7 +37,7 @@ void SharedLibServer(int argc, char* argv[]) {
     while (argc > 0) {
 
         argc -= 1;
-        
+
         // -p <port>
         if (strncmp(argv[argc], "-p", 2) == 0) {
 
@@ -165,7 +165,7 @@ void parseConfig() {
     // sovrascrivi le impostazioni che sono defaut
     if (parametri.configPath != NULL) {
         FILE* _tConf = NULL;
-    
+
         #ifdef _WIN32
         fopen_s(&_tConf, parametri.configPath, "r");
         #else // linux
@@ -176,7 +176,7 @@ void parseConfig() {
         }
 
         char line[1024];
-        
+
         // gestione config
         while (fgets(line, 1024, _tConf)) {
 
@@ -351,7 +351,7 @@ void spawnSockets() {
     if (!inet_pton(AF_INET, SERVERLISTEN, &masterSettings.sin_addr)) { // server IP
         ShowErr("non risulta un ip valido");
     }
-    
+
 
     // apre il server
     if (bind(socketMaster, (sockaddr*)&masterSettings, sizeof(masterSettings)) < 0) {
@@ -445,7 +445,7 @@ void writeLog() {
         ShowErr("Impossibile scrivere su log, file non aperto");
     }
 
-    
+
 
 }
 
@@ -475,7 +475,7 @@ void* Accept(void* rank) {
 
     SOCKET socket_descriptor;
 
-    unsigned long int T_s = (unsigned long int) rank;
+    //unsigned long int T_s = (unsigned long int) rank;
     unsigned long int T_c = 0;
     unsigned long int nonce = 0;
     unsigned long int challenge = 0;
@@ -532,67 +532,118 @@ void* Accept(void* rank) {
         #endif
         // sezione parallela
 
-        /*
-        1. ricevere HELO
-        2. generare challenge
-            challenge = T_s XOR rand
-        3. inviare challenge
-        4. ricevere AUTH dal client
-        5. risolve l'auth e risponde nel caso 200 o 400
-        6. printo sul log
-        risposte ai comandi + log
-        */
-
-        // passo 1
-        Recv(socket_descriptor, _t);
-
-        if (strncmp(_t, "HELO", 4) != 0) {
-            closesocket(socket_descriptor);
-            continue;
+        if (Autenticazione(socket_descriptor)){
+          continue;
         }
-        memset(_t, '\0', 1024);
-
-        // passo 2,3,4
-        nonce = rand() % 2147483647; // nonce
-        challenge = T_s ^ nonce; // T_s XOR nonce
-
-        snprintf(_t, 1024, "%lu", challenge); // unsigned long int to string
-
-        Send_Recv(socket_descriptor, _auth, _t, "300"); // invio lo status e challenge, ottengo l'auth
-
-
-        // passo 5
-        Strcpy(_command, 1024, strtok_r(_auth, " ;", &next_tok)); // AUTH
-
-        if (strncmp(_command, "AUTH", 4) != 0) {
-            closesocket(socket_descriptor);
-            continue;
-        }
-
-        // enc1
-        Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok)); // T_s XOR nonce XOR T_c
-        T_c = T_s ^ nonce ^ strtoul(_command, &endP, 10);
-
-        // enc2
-        Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok)); // T_c XOR nonce
-        challenge_nonce = T_c ^ strtoul(_command, &endP, 10);
-
-        if (challenge_nonce != nonce) {
-            Send(socket_descriptor, "400");
-            closesocket(socket_descriptor);
-            printf("\nClient Rifiutato\n");
-            continue;
-        }
-        Send(socket_descriptor, "200"); // nonce accettato
-
-        printf("\nClient Accettato\n");
-
-        // passo 6
-        // TODO: print to log
+        GestioneComandi(socket_descriptor);
 
     }
 
     return NULL;
+}
+
+int Autenticazione(SOCKET socket_descriptor) {
+  /*
+  1. ricevere HELO
+  2. generare challenge
+      challenge = T_s XOR rand
+  3. inviare challenge
+  4. ricevere AUTH dal client
+  5. risolve l'auth e risponde nel caso 200 o 400
+  6. printo sul log
+  risposte ai comandi + log
+  */
+  unsigned long int T_c = 0;
+  unsigned long int nonce = 0;
+  unsigned long int challenge = 0;
+  unsigned long int challenge_nonce = 0;
+
+  char* endP;
+  char* next_tok;
+
+  char _t[1024] = { 0 };
+  char _auth[1024] = { 0 };
+  char _command[1024] = { 0 };
+  // passo 1
+  Recv(socket_descriptor, _t);
+
+  if (strncmp(_t, "HELO", 4) != 0) {
+      closesocket(socket_descriptor);
+      return 1;
+  }
+  memset(_t, '\0', 1024);
+
+  // passo 2,3,4
+  nonce = rand() % 2147483647; // nonce
+  challenge = T_s ^ nonce; // T_s XOR nonce
+
+  snprintf(_t, 1024, "%lu", challenge); // unsigned long int to string
+
+  Send_Recv(socket_descriptor, _auth, _t, "300"); // invio lo status e challenge, ottengo l'auth
+
+
+  // passo 5
+  Strcpy(_command, 1024, strtok_r(_auth, " ;", &next_tok)); // AUTH
+
+  if (strncmp(_command, "AUTH", 4) != 0) {
+      closesocket(socket_descriptor);
+      return 1;
+  }
+
+  // enc1
+  Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok)); // T_s XOR nonce XOR T_c
+  T_c = T_s ^ nonce ^ strtoul(_command, &endP, 10);
+
+  // enc2
+  Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok)); // T_c XOR nonce
+  challenge_nonce = T_c ^ strtoul(_command, &endP, 10);
+
+  if (challenge_nonce != nonce) {
+      Send(socket_descriptor, "400");
+      closesocket(socket_descriptor);
+      printf("\nClient Rifiutato\n");
+      return 1;
+  }
+  Send(socket_descriptor, "200"); // nonce accettato
+
+  printf("\nClient Accettato\n");
+
+  // passo 6
+  // TODO: print to log
+  return 0;
+}
+
+void GestioneComandi(SOCKET socket_descriptor) {
+  char* command = (char*)Calloc(1024, sizeof(char));
+  Recv(socket_descriptor, command);
+  char* brkt = NULL;
+  command = strtok_r(command, " ", &brkt);
+  if (strcmp(command, "LSF") == 0) {
+    command = strtok_r(NULL, " ", &brkt);
+    LSF(command, socket_descriptor);
+  }
+}
+
+void LSF(char* path, SOCKET socket_descriptor) {
+  if (!(std::filesystem::exists(path))){
+    Send(socket_descriptor, "400");
+    return;
+  }
+  char* records = (char*)Calloc(1, sizeof(char));
+  char* buffer = NULL;
+  int n;
+  printf("Prima del for\n");
+  for (auto& p: std::filesystem::directory_iterator(path, std::filesystem::directory_options::skip_permission_denied)) {
+    printf("dentro for\n");
+    if (p.is_directory())
+      continue;
+    n = asprintf(&buffer, "%lu %s\r\n", std::filesystem::file_size(p.path()), p.path().c_str());
+    records = (char*)realloc(records, strlen(records)+ n);
+    strncat(records, buffer, n);
+  }
+  records = (char*)realloc(records, strlen(records)+ strlen(" \r\n.\r\n"));
+  strncat(records, " \r\n.\r\n", strlen(" \r\n.\r\n"));
+  printf("Lungezza record: %ld", strlen(records));
 }
 
 void Send(SOCKET soc, const char* str) {
