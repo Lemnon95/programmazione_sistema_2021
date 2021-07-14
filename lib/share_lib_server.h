@@ -51,6 +51,9 @@ inline int chiusura = 0;
 
 #endif //_WIN32
 
+//////////////////////////////////////////////////////////////////////////////////
+// variabili e strutture
+
 // definizione della coda
 // la struttura conterrà i socket delle connessioni accettate
 typedef struct queue {
@@ -63,10 +66,7 @@ inline Queue* rear;
 inline int size = 0; //queue size
 
 
-
-
-// struttura per mantenere le impostazioni passate da argomenti
-/*
+/*  struttura per mantenere le impostazioni passate da argomenti
 parametri opzionali:
 -p <TCP port>		porta TCP su cui stare in ascolto (default 8888);
 -n <thread max>		numero massimo di thread per gestire le richieste (default 10);
@@ -74,13 +74,13 @@ parametri opzionali:
 -s					stampa su stdout il token T_s quando viene generato;
 -l <path file>		percorso di log (default /tmp/server.log)
 */
-struct params {
+typedef struct _params {
 	short unsigned int port; // 0 - 65535
 	short unsigned int nthread; //0 - 65535, non più di 65534 poichè saturerebbero le porte disponibili (65535-1 dove -1 è del server stesso)
 	char* configPath; // stringa di lunghezza variabile
 	bool printToken; // indice booleano per indicare se printare o meno il token T_s
 	char* logPath; // stringa variabile del percoso dei log
-};
+} params;
 
 
 inline params parametri;
@@ -90,20 +90,24 @@ inline SOCKET socketMaster = 0;
 #ifdef _WIN32
 inline void** threadChild = NULL;
 #endif //WIN32
-inline struct sockaddr_storage socketChild;
+inline sockaddr_storage socketChild;
 
-
+////////////////////////////////////////////////////////////////////////////////////
+// funzioni
 
 void SharedLibServer(int argc, char* argv[]);
-unsigned long int getToken_s();
-void spawnSockets();
-void beginServer();
-
+void CloseServer();
 void parseConfig();
+
+unsigned long int getToken_s();
 void getPassphrase(char* passphrase);
 unsigned long int generateToken();
 unsigned long int hashToken(char* token);
+
+void spawnSockets();
+void beginServer();
 void clearSocket();
+
 void openLog();
 void closeLog();
 
@@ -118,11 +122,12 @@ void Send(SOCKET soc, const char* str);
 void Recv(SOCKET soc, char* _return);
 void Send_Recv(SOCKET soc, char* _return, const char* str = NULL, const char* status = NULL);
 
+////////////////////////////////////////////////////////////////////////////////////
 
-void Enqueue(SOCKET socket_descriptor, struct queue** front, struct queue** rear);
+void Enqueue(SOCKET  socket_descriptor, Queue** front, Queue** rear);
+int  Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear);
 
-int Dequeue(SOCKET* socket_descriptor, struct queue** front, struct queue** rear);
-
+////////////////////////////////////////////////////////////////////////////////////
 
 // calloc Wrapper
 void* Calloc(unsigned long int nmemb, unsigned long int size);
@@ -133,7 +138,7 @@ void Free(void * arg, int size);
 // strcpy Wrapper
 void Strcpy(char* dest, unsigned int size, const char* src);
 
-/* Handler di CTRL+C */
+/* Handler SIGHUP */
 #ifdef __linux__
 void my_handler(int s);
 #endif // __linux__

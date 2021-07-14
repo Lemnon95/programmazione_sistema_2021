@@ -1,6 +1,6 @@
 #include "share_lib_server.h"
 
-// costruttore classe
+// funzione init
 void SharedLibServer(int argc, char* argv[]) {
 
     char* _path = NULL;
@@ -26,8 +26,7 @@ void SharedLibServer(int argc, char* argv[]) {
     // pulisco la variabile _Tpath
     Free(_Tpath, MAX_PATH + 1);
     #else
-    //_path = (char*)Calloc(sizeof("/tmp/server.log")+1,sizeof(char)); // sizeof("123") + \0 = 3+1, conta in automatico un \0 alla fine
-    Strcpy(_path, MAX_PATH, "/tmp/server.log");
+    Strcpy(_path, MAX_PATH+1, "/tmp/server.log");
     #endif // _WIN32
 
     // parametri di default
@@ -152,14 +151,13 @@ void SharedLibServer(int argc, char* argv[]) {
 
 }
 // distruttore classe
-/*void ~SharedLibServer() {
-    // alla distruzione di questa classe
-    printf("distruzione classe\n");
+void CloseServer() {
+
     if(FileDescLog != NULL)
         closeLog();
 
     clearSocket();
-}*/
+}
 
 void parseConfig() {
 
@@ -167,11 +165,12 @@ void parseConfig() {
     // sovrascrivi le impostazioni che sono defaut
     if (parametri.configPath != NULL) {
         FILE* _tConf = NULL;
-    #ifdef _WIN32
+    
+        #ifdef _WIN32
         fopen_s(&_tConf, parametri.configPath, "r");
-    #else // linux
+        #else // linux
         _tConf = fopen(parametri.configPath, "r");
-    #endif
+        #endif
         if (errno) { // errno viene settato anche con la fopen, come richiesto da POSIX
             ShowErr("impossibile aprire (o inesistente) file config");
         }
@@ -241,6 +240,20 @@ void parseConfig() {
 
 }
 
+//////////////////////////////////////////////////////////////////////////////////
+
+unsigned long int getToken_s() {
+
+    T_s = generateToken();
+
+    if (parametri.printToken) {
+        printf("\ntoken: %lu\n", T_s);
+    }
+
+    return T_s;
+
+}
+
 void getPassphrase(char* passphrase) {
     printf("Immetti passphrase (max 254): ");
     fgets(passphrase, 254, stdin);
@@ -276,67 +289,7 @@ unsigned long int hashToken(char* token) {
     return k;
 }
 
-void clearSocket() {
-    // se instanziato, chiudi il socket
-    if (socketMaster != 0) {
-        closesocket(socketMaster);
-    }
-    // chiudi i socket in ascolto
-    for (int i = 0; i < parametri.nthread; i++) {
-      #ifdef _WIN32
-        closesocket((SOCKET)threadChild[i]);
-      #else //_linux_
-        closesocket(threadChild[i]);
-      #endif
-    }
-
-
-#ifdef _WIN32
-    WSACleanup();
-#endif
-}
-
-// TODO: nel scrivedere su log usare flock()
-void openLog() {
-    // controlla se il file è già aperto
-    if (FileDescLog == NULL) {
-        // se non è aperto
-        // apri il file in modalità Append
-        #ifdef _WIN32
-        fopen_s(&(FileDescLog),(char*)(parametri.logPath), "a");
-        #else
-        FileDescLog = fopen((char*)(parametri.logPath), "a");
-        #endif
-        // se da errore
-        if (errno) {
-            ShowErr("errore nell'aprire il file");
-        }
-    }
-
-}
-
-void closeLog() {
-    // se è aperto il file
-    if (FileDescLog != NULL) {
-        // tenta di chiuderlo
-        if (fclose(FileDescLog)) {
-            ShowErr("errore nel chiudere il file log");
-        }
-    }
-
-}
-
-unsigned long int getToken_s() {
-
-    T_s = generateToken();
-
-    if (parametri.printToken) {
-        printf("\ntoken: %lu\n", T_s);
-    }
-
-    return T_s;
-
-}
+//////////////////////////////////////////////////////////////////////////////////
 
 void spawnSockets() {
 #ifdef _WIN32
@@ -451,8 +404,58 @@ void beginServer() {
     closesocket(socketMaster);
 }
 
+void clearSocket() {
+    // se instanziato, chiudi il socket
+    if (socketMaster != 0) {
+        closesocket(socketMaster);
+    }
+    // chiudi i socket in ascolto
+    for (int i = 0; i < parametri.nthread; i++) {
+#ifdef _WIN32
+        closesocket((SOCKET)threadChild[i]);
+#else //_linux_
+        closesocket(threadChild[i]);
+#endif
+    }
 
-// end class
+
+#ifdef _WIN32
+    WSACleanup();
+#endif
+}
+
+//////////////////////////////////////////////////////////////////////////////////
+
+// TODO: nel scrivedere su log usare flock()
+void openLog() {
+    // controlla se il file è già aperto
+    if (FileDescLog == NULL) {
+        // se non è aperto
+        // apri il file in modalità Append
+#ifdef _WIN32
+        fopen_s(&(FileDescLog), (char*)(parametri.logPath), "a");
+#else
+        FileDescLog = fopen((char*)(parametri.logPath), "a");
+#endif
+        // se da errore
+        if (errno) {
+            ShowErr("errore nell'aprire il file");
+        }
+    }
+
+}
+
+void closeLog() {
+    // se è aperto il file
+    if (FileDescLog != NULL) {
+        // tenta di chiuderlo
+        if (fclose(FileDescLog)) {
+            ShowErr("errore nel chiudere il file log");
+}
+    }
+
+}
+
 //////////////////////////////////////////////////////////////////////////////////
 
 // Dopo che un thread viene creato esegue questa funzione
@@ -590,7 +593,6 @@ void* Accept(void* rank) {
     return NULL;
 }
 
-
 void Send(SOCKET soc, const char* str) {
 
     if (str == NULL) {
@@ -626,8 +628,9 @@ void Send_Recv(SOCKET soc, char* _return, const char* str, const char* status) {
 
 }
 
-
+//////////////////////////////////////////////////////////////////////////////////
 // funzioni per gestire la pila di socket
+
 void Enqueue(SOCKET socket_descriptor, Queue** front, Queue** rear) {
     Queue* task = (Queue*)malloc(1 * sizeof(Queue));
 
@@ -666,6 +669,8 @@ int Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear) {
     return 0;
 }
 
+//////////////////////////////////////////////////////////////////////////////////
+// Wrapper
 
 // calloc Wrapper
 void* Calloc(unsigned long int count, unsigned long int size) {
