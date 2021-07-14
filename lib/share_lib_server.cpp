@@ -1,7 +1,7 @@
 #include "share_lib_server.h"
 
 // costruttore classe
-SharedLibServer::SharedLibServer(int argc, char* argv[]) {
+void SharedLibServer(int argc, char* argv[]) {
 
     char* _path = NULL;
     _path = (char*)Calloc(MAX_PATH + 1, sizeof(char));
@@ -31,7 +31,7 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
     #endif // _WIN32
 
     // parametri di default
-    this->parametri = { 8888, 10, NULL, false, _path };
+    parametri = { 8888, 10, NULL, false, _path };
 
     // parsing argomenti
     unsigned long long maxArg = argc;
@@ -52,13 +52,13 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
 
             }
             // conversione stringa in unsigned short
-            this->parametri.port = (unsigned short)strtoul(argv[argc + 1], NULL, 0);
+            parametri.port = (unsigned short)strtoul(argv[argc + 1], NULL, 0);
             if (errno) {
                 ShowErr("il parametro di -p non risulta un numero");
 
             }
 
-            if (this->parametri.port == 0) {
+            if (parametri.port == 0) {
                 ShowErr("porta 0 non è valida");
             }
 
@@ -76,12 +76,12 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
                 ShowErr("parametro -n incompleto");
             }
 
-            this->parametri.nthread = atoi(argv[argc + 1]);
+            parametri.nthread = atoi(argv[argc + 1]);
             if (errno) {
                 ShowErr("il parametro di -n non risulta un numero");
             }
 
-            if (this->parametri.nthread == 0) {
+            if (parametri.nthread == 0) {
                 ShowErr("numero di thread invalido");
             }
 
@@ -100,14 +100,14 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
                 ShowErr("parametro -c incompleto");
             }
 
-            this->parametri.configPath = (char*)Calloc(sizeof(argv[argc + 1])+1, sizeof(char));
-            this->parametri.configPath = argv[argc + 1];
+            parametri.configPath = (char*)Calloc(sizeof(argv[argc + 1])+1, sizeof(char));
+            parametri.configPath = argv[argc + 1];
 
         }
 
         // -s
         if (strcmp(argv[argc], "-s") == 0) {
-            this->parametri.printToken = true;
+            parametri.printToken = true;
         }
 
         // -l <path>
@@ -122,8 +122,8 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
                 ShowErr("parametro -l incompleto");
             }
 
-            this->parametri.logPath = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
-            this->parametri.logPath = argv[argc + 1];
+            parametri.logPath = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
+            parametri.logPath = argv[argc + 1];
 
         }
 
@@ -131,46 +131,46 @@ SharedLibServer::SharedLibServer(int argc, char* argv[]) {
 
     // debug print
     printf("---\nPorta: %d\nNumero thread: %d\nConfig path: %s \nLog path: %s \nStampa token: %d\n---\n",
-        this->parametri.port,
-        this->parametri.nthread,
-        this->parametri.configPath,
-        this->parametri.logPath,
-        this->parametri.printToken);
+        parametri.port,
+        parametri.nthread,
+        parametri.configPath,
+        parametri.logPath,
+        parametri.printToken);
 
 
     // se definito leggi il config
     // sovrascrivi le impostazioni che sono defaut
-    this->parseConfig();
+    parseConfig();
 
     // debug print
     printf("---\nPorta: %d\nNumero thread: %d\nConfig path: %s \nLog path: %s \nStampa token: %d\n---\n",
-        this->parametri.port,
-        this->parametri.nthread,
-        this->parametri.configPath,
-        this->parametri.logPath,
-        this->parametri.printToken);
+        parametri.port,
+        parametri.nthread,
+        parametri.configPath,
+        parametri.logPath,
+        parametri.printToken);
 
 }
 // distruttore classe
-SharedLibServer::~SharedLibServer() {
+/*void ~SharedLibServer() {
     // alla distruzione di questa classe
     printf("distruzione classe\n");
-    if(this->FileDescLog != NULL)
-        this->closeLog();
+    if(FileDescLog != NULL)
+        closeLog();
 
-    this->clearSocket();
-}
+    clearSocket();
+}*/
 
-void SharedLibServer::parseConfig() {
+void parseConfig() {
 
     // se definito leggi il config
     // sovrascrivi le impostazioni che sono defaut
-    if (this->parametri.configPath != NULL) {
+    if (parametri.configPath != NULL) {
         FILE* _tConf = NULL;
     #ifdef _WIN32
-        fopen_s(&_tConf, this->parametri.configPath, "r");
+        fopen_s(&_tConf, parametri.configPath, "r");
     #else // linux
-        _tConf = fopen(this->parametri.configPath, "r");
+        _tConf = fopen(parametri.configPath, "r");
     #endif
         if (errno) { // errno viene settato anche con la fopen, come richiesto da POSIX
             ShowErr("impossibile aprire (o inesistente) file config");
@@ -198,13 +198,13 @@ void SharedLibServer::parseConfig() {
 
             // i corrisponde al primo valore presente nel file
             // nello shwitch associo un numero al rispettivo valore
-            // di this->parametri
+            // di parametri
             // non è ammessa la modifica del configPath (dato in input)
             switch (i) 	{
                 case 0:
                     port = std::stoi(configData);
                     if (port > 0 && port < 65536) {
-                        this->parametri.port = port;
+                        parametri.port = port;
                     }
                     else {
                         ShowErr("errore nel valore del config per i = 0");
@@ -213,7 +213,7 @@ void SharedLibServer::parseConfig() {
                 case 1:
                     nthread = std::stoi(configData);
                     if (nthread > 0 && nthread < 65536) {
-                        this->parametri.nthread = nthread;
+                        parametri.nthread = nthread;
                     }
                     else {
                         ShowErr("errore nel valore del config per i = 1");
@@ -222,11 +222,11 @@ void SharedLibServer::parseConfig() {
                 case 2:
                     printTok = std::stoi(configData);
                     if (printTok > 0) {
-                        this->parametri.printToken = true;
+                        parametri.printToken = true;
                     }
                     break;
                 case 3:
-                    this->parametri.logPath = configData;
+                    parametri.logPath = configData;
 
                     break;
                 default:
@@ -241,18 +241,18 @@ void SharedLibServer::parseConfig() {
 
 }
 
-void SharedLibServer::getPassphrase(char* passphrase) {
+void getPassphrase(char* passphrase) {
     printf("Immetti passphrase (max 254): ");
     fgets(passphrase, 254, stdin);
 }
 
-unsigned long int SharedLibServer::generateToken() {
+unsigned long int generateToken() {
 
     char* passphrase = (char*)Calloc(256, sizeof(char));
 
-    this->getPassphrase(passphrase);
+    getPassphrase(passphrase);
 
-    unsigned long int k = this->hashToken(passphrase);
+    unsigned long int k = hashToken(passphrase);
 
     // reset passphrase
     Free(passphrase, 256);
@@ -260,7 +260,7 @@ unsigned long int SharedLibServer::generateToken() {
     return k;
 }
 
-unsigned long int SharedLibServer::hashToken(char* token) {
+unsigned long int hashToken(char* token) {
 
 
     unsigned long int k = 5381;
@@ -276,15 +276,15 @@ unsigned long int SharedLibServer::hashToken(char* token) {
     return k;
 }
 
-void SharedLibServer::clearSocket() {
+void clearSocket() {
     // se instanziato, chiudi il socket
-    if (this->socketMaster != 0) {
-        closesocket(this->socketMaster);
+    if (socketMaster != 0) {
+        closesocket(socketMaster);
     }
     // chiudi i socket in ascolto
-    for (int i = 0; i < this->parametri.nthread; i++) {
+    for (int i = 0; i < parametri.nthread; i++) {
       #ifdef _WIN32
-        closesocket((SOCKET)this->threadChild[i]);
+        closesocket((SOCKET)threadChild[i]);
       #else //_linux_
         closesocket(threadChild[i]);
       #endif
@@ -297,15 +297,15 @@ void SharedLibServer::clearSocket() {
 }
 
 // TODO: nel scrivedere su log usare flock()
-void SharedLibServer::openLog() {
+void openLog() {
     // controlla se il file è già aperto
-    if (this->FileDescLog == NULL) {
+    if (FileDescLog == NULL) {
         // se non è aperto
         // apri il file in modalità Append
         #ifdef _WIN32
-        fopen_s(&(this->FileDescLog),(char*)(this->parametri.logPath), "a");
+        fopen_s(&(FileDescLog),(char*)(parametri.logPath), "a");
         #else
-        this->FileDescLog = fopen((char*)(this->parametri.logPath), "a");
+        FileDescLog = fopen((char*)(parametri.logPath), "a");
         #endif
         // se da errore
         if (errno) {
@@ -315,30 +315,30 @@ void SharedLibServer::openLog() {
 
 }
 
-void SharedLibServer::closeLog() {
+void closeLog() {
     // se è aperto il file
-    if (this->FileDescLog != NULL) {
+    if (FileDescLog != NULL) {
         // tenta di chiuderlo
-        if (fclose(this->FileDescLog)) {
+        if (fclose(FileDescLog)) {
             ShowErr("errore nel chiudere il file log");
         }
     }
 
 }
 
-unsigned long int SharedLibServer::getToken_s() {
+unsigned long int getToken_s() {
 
-    this->T_s = this->generateToken();
+    T_s = generateToken();
 
-    if (this->parametri.printToken) {
-        printf("\ntoken: %lu\n", this->T_s);
+    if (parametri.printToken) {
+        printf("\ntoken: %lu\n", T_s);
     }
 
     return T_s;
 
 }
 
-void SharedLibServer::spawnSockets() {
+void spawnSockets() {
 #ifdef _WIN32
     WSADATA wsaData;
     int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -354,31 +354,31 @@ void SharedLibServer::spawnSockets() {
     PF_INET = Internet Protocol (IP)
     SOCK_STREAM = TPC/IP
     */
-    this->socketMaster = socket(PF_INET, SOCK_STREAM, 0);
-    if (this->socketMaster < 0) {
-        this->clearSocket();
+    socketMaster = socket(PF_INET, SOCK_STREAM, 0);
+    if (socketMaster < 0) {
+        clearSocket();
         ShowErr("Errore creazione socket master");
     }
 
     int _e = true;
 
-    if (setsockopt(this->socketMaster, SOL_SOCKET, SO_REUSEADDR, (char*)&_e, sizeof(_e)) < 0) {
+    if (setsockopt(socketMaster, SOL_SOCKET, SO_REUSEADDR, (char*)&_e, sizeof(_e)) < 0) {
         ShowErr("impossibile impostare il socket server");
     }
 
     // crea figli
     #ifdef _WIN32
-    this->threadChild = (void**)Calloc(this->parametri.nthread, sizeof(void *));
+    threadChild = (void**)Calloc(parametri.nthread, sizeof(void *));
     #else
-    threadChild = (pthread_t*)Calloc(this->parametri.nthread, sizeof(pthread_t));
+    threadChild = (pthread_t*)Calloc(parametri.nthread, sizeof(pthread_t));
     #endif
 
 
     // instanzio i thread nella lista
-    for (int q = 0; q < this->parametri.nthread; q++) {
+    for (int q = 0; q < parametri.nthread; q++) {
 
     #ifdef _WIN32
-        if ((this->threadChild[q] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), (LPVOID)(this->T_s), 0, NULL)) == NULL) {
+        if ((threadChild[q] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)(Accept), (LPVOID)(T_s), 0, NULL)) == NULL) {
             ShowErr("Impossibile creare un thread");
         }
 
@@ -386,7 +386,7 @@ void SharedLibServer::spawnSockets() {
       pthread_mutex_init(&mutex, NULL);
       pthread_cond_init(&cond_var, NULL);
       // TODO: ricordarsi di fare il destroy
-      if (pthread_create(&threadChild[(long)q], NULL, Accept, (void*)this->T_s) != 0)
+      if (pthread_create(&threadChild[(long)q], NULL, Accept, (void*)T_s) != 0)
             printf("Failed to create thread\n");
     #endif
 
@@ -400,14 +400,14 @@ void SharedLibServer::spawnSockets() {
     if (!inet_pton(AF_INET, SERVERLISTEN, &masterSettings.sin_addr)) { // server IP
         ShowErr("non risulta un ip valido");
     }
-    masterSettings.sin_port = this->parametri.port; // Server port
+    masterSettings.sin_port = parametri.port; // Server port
 
     // apre il server
-    if (bind(this->socketMaster, (struct sockaddr*)&masterSettings, sizeof(masterSettings)) < 0) {
+    if (bind(socketMaster, (struct sockaddr*)&masterSettings, sizeof(masterSettings)) < 0) {
         ShowErr("Impossibile aprire il socket del server");
     }
 
-    if (listen(this->socketMaster, this->parametri.nthread) < 0) {
+    if (listen(socketMaster, parametri.nthread) < 0) {
         ShowErr("Impossibile stare in ascolto sulla porta specificata");
     }
 
@@ -418,16 +418,16 @@ void SharedLibServer::spawnSockets() {
 
 }
 
-void SharedLibServer::beginServer() {
+void beginServer() {
 
     socklen_t addr_size;
     SOCKET newSocket = 0;
 
     while (1) {
         //Accept call creates a new socket for the incoming connection
-        addr_size = sizeof(this->socketChild);
+        addr_size = sizeof(socketChild);
         // bloccante
-        newSocket = accept(this->socketMaster, (sockaddr*)&(this->socketChild), &addr_size);
+        newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
         if (newSocket == -1)
           break;
         Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
@@ -448,7 +448,7 @@ void SharedLibServer::beginServer() {
         #endif // _WIN32
 
     }
-    closesocket(this->socketMaster);
+    closesocket(socketMaster);
 }
 
 

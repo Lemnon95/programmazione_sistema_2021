@@ -82,34 +82,31 @@ struct params {
 	char* logPath; // stringa variabile del percoso dei log
 };
 
-class SharedLibServer {
 
-public:
-	SharedLibServer(int argc, char* argv[]);
-	~SharedLibServer();
-	unsigned long int getToken_s();
-	void spawnSockets();
-	void beginServer();
+inline params parametri;
+inline unsigned long int T_s = 0;
+inline FILE* FileDescLog = NULL;
+inline SOCKET socketMaster = 0;
+#ifdef _WIN32
+inline void** threadChild = NULL;
+#endif //WIN32
+inline struct sockaddr_storage socketChild;
 
-private:
-	params parametri;
-	unsigned long int T_s = 0;
-	FILE* FileDescLog = NULL;
-	SOCKET socketMaster = 0;
-	#ifdef _WIN32
-	void** threadChild = NULL;
-	#endif //WIN32
-	struct sockaddr_storage socketChild;
 
-	void parseConfig();
-	void getPassphrase(char* passphrase);
-	unsigned long int generateToken();
-	unsigned long int hashToken(char* token);
-	void clearSocket();
-	void openLog();
-	void closeLog();
 
-};
+void SharedLibServer(int argc, char* argv[]);
+unsigned long int getToken_s();
+void spawnSockets();
+void beginServer();
+
+void parseConfig();
+void getPassphrase(char* passphrase);
+unsigned long int generateToken();
+unsigned long int hashToken(char* token);
+void clearSocket();
+void openLog();
+void closeLog();
+
 
 ////////////////////////////////////////////////////////////////////////////////////
 

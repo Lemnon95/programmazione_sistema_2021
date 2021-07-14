@@ -4,7 +4,6 @@
 #include <iostream>
 #include "../../lib/share_lib_server.h"
 
-SharedLibServer* a = NULL;
 
 int main(int argc, char* argv[]) {
     // parser input
@@ -17,16 +16,17 @@ int main(int argc, char* argv[]) {
     sigaction(SIGHUP, &sigIntHandler, NULL);
     #endif
 
-    a = new SharedLibServer(argc, argv);
+    SharedLibServer(argc, argv);
+
 
     // genera token
-    a->getToken_s();
+    getToken_s();
 
     // crea threads
-    a->spawnSockets();
+    spawnSockets();
 
     // rimani in ascolto
-    a->beginServer();
+    beginServer();
 
     return 0;
 }
