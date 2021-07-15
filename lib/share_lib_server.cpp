@@ -153,6 +153,12 @@ void SharedLibServer(int argc, char* argv[]) {
 
 void CloseServer() {
 
+    #ifdef WIN32
+    DeleteCriticalSection(&FileLock);
+    #else
+        // TODO: distruzione pthread lock
+    #endif
+
     if(FileDescLog != NULL)
         closeLog();
 
@@ -362,7 +368,7 @@ void spawnSockets() {
     }
 
     char _t[17] = {0};
-    inet_ntop(AF_INET, &masterSettings.sin_addr, _t,17);
+    inet_ntop(AF_INET, &masterSettings.sin_addr, _t, 17);
     printf("\nServer in ascolto su %s:%d\n", _t, masterSettings.sin_port);
 
 }
@@ -372,6 +378,14 @@ void beginServer() {
     socklen_t addr_size;
     SOCKET newSocket = 0;
 
+    openLog();
+
+    #ifdef WIN32
+    InitializeCriticalSection(&FileLock);
+    #else
+    // TODO: inizializzazione pthread lock
+    #endif
+
     while (1) {
         //Accept call creates a new socket for the incoming connection
         addr_size = sizeof(socketChild);
@@ -379,7 +393,7 @@ void beginServer() {
         if (newSocket == -1)
           break;
         Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
-
+        
         printf("\nConnessione in entrata\n");
 
         #ifdef _WIN32
@@ -396,7 +410,10 @@ void beginServer() {
         #endif // _WIN32
 
     }
-    closesocket(socketMaster);
+
+    // terminazione programma
+    CloseServer();
+    
 }
 
 void clearSocket() {
@@ -421,7 +438,6 @@ void clearSocket() {
 
 //////////////////////////////////////////////////////////////////////////////////
 
-// TODO: nel scrivedere su log usare flock()
 void openLog() {
     // controlla se il file è già aperto
     if (FileDescLog == NULL) {
@@ -437,16 +453,46 @@ void openLog() {
             ShowErr("errore nell'aprire il file");
         }
     }
-
 }
 
-void writeLog() {
-    if (FileDescLog == NULL) {
-        ShowErr("Impossibile scrivere su log, file non aperto");
-    }
+void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
+    if (FileDescLog == NULL) ShowErr("Impossibile scrivere su log, file non aperto");
+#ifdef WIN32
+    EnterCriticalSection(&FileLock);
+#else
+    // TODO: pthread enter critcial
+#endif
 
+    // timestamp
+    time_t rawtime;
+    struct tm timeinfo;
+    char time_stamp[80];
+    if (time(&rawtime) < 0) ShowErr("Impossibile ottenere il tempo della macchina");
+    
+    localtime_s(&timeinfo ,&rawtime);
 
+    if (errno) ShowErr("Impossibile convertire il tempo locale");
+    
+    strftime(time_stamp, sizeof(time_stamp), "%d-%m-%Y %H:%M:%S", &timeinfo);
 
+    //ip:port
+    sockaddr_in client;
+    socklen_t s = sizeof(client);
+    getsockname(soc, (sockaddr*)&client, &s);
+
+    char ip[17] = { 0 };
+    inet_ntop(AF_INET, &client.sin_addr, ip, 17);
+    
+
+    fprintf(FileDescLog, "%s %lu %s:%lu %s\n", time_stamp, Tpid, ip, client.sin_port, command);
+
+#ifdef WIN32
+    LeaveCriticalSection(&FileLock);
+#else
+    // TODO: pthread exit critical
+#endif
+
+    
 }
 
 void closeLog() {
@@ -455,9 +501,8 @@ void closeLog() {
         // tenta di chiuderlo
         if (fclose(FileDescLog)) {
             ShowErr("errore nel chiudere il file log");
-}
+        }
     }
-
 }
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -475,33 +520,18 @@ void* Accept(void* rank) {
 
     SOCKET socket_descriptor;
 
-    //unsigned long int T_s = (unsigned long int) rank;
-    unsigned long int T_c = 0;
-    unsigned long int nonce = 0;
-    unsigned long int challenge = 0;
-    unsigned long int challenge_nonce = 0;
+    unsigned long int Tpid = 0;
 
-    char* endP;
-    char* next_tok;
+    #ifdef WIN32
+    Tpid = GetCurrentThreadId();
+    #else
+    // TODO: pthread thread id
+    Tpid = -1;
+    #endif
 
-    char _t[1024] = { 0 };
-    char _auth[1024] = { 0 };
-    char _command[1024] = { 0 };
 
     while (1) {
-        // cleanup vars
-        T_c = 0;
-        nonce = 0;
-        challenge = 0;
-        challenge_nonce = 0;
-
-        next_tok = NULL;
-        endP = NULL;
-
-        memset(_t, '\0', 1024);
-        memset(_auth, '\0', 1024);
-        memset(_command, '\0', 1024);
-
+        
         // i thread vanno a dormire
         #ifdef _WIN32
         EnterCriticalSection(&CritSec);
@@ -535,7 +565,7 @@ void* Accept(void* rank) {
         if (Autenticazione(socket_descriptor)){
           continue;
         }
-        GestioneComandi(socket_descriptor);
+        GestioneComandi(socket_descriptor, Tpid);
 
     }
 
@@ -550,7 +580,6 @@ int Autenticazione(SOCKET socket_descriptor) {
   3. inviare challenge
   4. ricevere AUTH dal client
   5. risolve l'auth e risponde nel caso 200 o 400
-  6. printo sul log
   risposte ai comandi + log
   */
   unsigned long int T_c = 0;
@@ -607,29 +636,39 @@ int Autenticazione(SOCKET socket_descriptor) {
   Send(socket_descriptor, "200"); // nonce accettato
 
   printf("\nClient Accettato\n");
+  
 
-  // passo 6
-  // TODO: print to log
   return 0;
 }
 
-void GestioneComandi(SOCKET socket_descriptor) {
+void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
   char* command = (char*)Calloc(1024, sizeof(char));
+  char* dup_cmd = (char*)Calloc(1024, sizeof(char));
   char* brkt = NULL;
 
   Recv(socket_descriptor, command);
   
+  Strcpy(dup_cmd, 1024, command);
+
   command = strtok_r(command, " ", &brkt);
   if (strncmp(command, "LSF", 3) == 0) {
     command = strtok_r(NULL, " ", &brkt);
-    LSF(socket_descriptor, command);
+    if (LSF(socket_descriptor, command) == 0) {
+        writeLog(Tpid, socket_descriptor, dup_cmd);
+    }
   }
+
+  // altri comandi
+
+
+
+  //Free(command, strlen(command)+1);
 }
 
-void LSF(SOCKET socket_descriptor, char* path) {
+int LSF(SOCKET socket_descriptor, char* path) {
     if (!std::filesystem::exists(path)){
         Send(socket_descriptor, "400");
-        return;
+        return 1;
     }
     char* records = (char*)Calloc(1, sizeof(char));
     char* buffer = NULL;
@@ -680,7 +719,8 @@ void LSF(SOCKET socket_descriptor, char* path) {
     strncat(records, " \r\n.\r\n", strlen(" \r\n.\r\n"));
     #endif
 
-    printf("Lungezza record: %lld", strlen(records));
+    //printf("Lungezza record: %lld", strlen(records));
+    return 0;
 }
 
 void Send(SOCKET soc, const char* str) {

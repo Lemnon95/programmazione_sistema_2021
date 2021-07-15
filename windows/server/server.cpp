@@ -28,9 +28,6 @@ int main(int argc, char* argv[]) {
     // rimani in ascolto
     beginServer();
 
-
-    CloseServer();
-
     return 0;
 }
 

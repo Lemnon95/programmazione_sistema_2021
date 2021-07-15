@@ -29,6 +29,8 @@
 // win32 condition variable
 inline CONDITION_VARIABLE Threadwait;
 inline CRITICAL_SECTION CritSec;
+inline CRITICAL_SECTION FileLock;
+
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -111,6 +113,7 @@ void beginServer();
 void clearSocket();
 
 void openLog();
+void writeLog(unsigned long int Tpid, SOCKET soc, char* command);
 void closeLog();
 
 
@@ -119,8 +122,8 @@ void closeLog();
 // thread function
 void* Accept(void* rank);
 int Autenticazione(SOCKET socket_descriptor);
-void GestioneComandi(SOCKET socket_descriptor);
-void LSF(SOCKET socket_descriptor, char* path);
+void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid);
+int LSF(SOCKET socket_descriptor, char* path);
 
 // send-recv Wrapper
 void Send(SOCKET soc, const char* str);
