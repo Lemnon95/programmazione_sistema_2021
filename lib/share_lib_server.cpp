@@ -488,10 +488,8 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
     inet_ntop(AF_INET, &client.sin_addr, ip, 17);
 
     printf("%s %lu %s:%u %s\n", time_stamp, Tpid, ip, client.sin_port, command);
-    int n;
-    n = fprintf(FileDescLog, "%s %lu %s:%u %s\n", time_stamp, Tpid, ip, client.sin_port, command);
+    fprintf(FileDescLog, "%s %lu %s:%u %s\n", time_stamp, Tpid, ip, client.sin_port, command);
     fflush(FileDescLog);
-    printf("Numero caratteri scritti: %d", n);
 
 
 #ifdef WIN32
