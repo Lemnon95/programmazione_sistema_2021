@@ -393,7 +393,7 @@ void beginServer() {
         if (newSocket == -1)
           break;
         Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
-        
+
         printf("\nConnessione in entrata\n");
 
         #ifdef _WIN32
@@ -413,7 +413,7 @@ void beginServer() {
 
     // terminazione programma
     CloseServer();
-    
+
 }
 
 void clearSocket() {
@@ -468,11 +468,15 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
     struct tm timeinfo;
     char time_stamp[80];
     if (time(&rawtime) < 0) ShowErr("Impossibile ottenere il tempo della macchina");
-    
+
+    #ifdef _WIN32
     localtime_s(&timeinfo ,&rawtime);
+    #else //__linux___
+    localtime_r(&rawtime, &timeinfo);
+    #endif
 
     if (errno) ShowErr("Impossibile convertire il tempo locale");
-    
+
     strftime(time_stamp, sizeof(time_stamp), "%d-%m-%Y %H:%M:%S", &timeinfo);
 
     //ip:port
@@ -482,9 +486,13 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
 
     char ip[17] = { 0 };
     inet_ntop(AF_INET, &client.sin_addr, ip, 17);
-    
 
-    fprintf(FileDescLog, "%s %lu %s:%lu %s\n", time_stamp, Tpid, ip, client.sin_port, command);
+    printf("%s %lu %s:%u %s\n", time_stamp, Tpid, ip, client.sin_port, command);
+    int n;
+    n = fprintf(FileDescLog, "%s %lu %s:%u %s\n", time_stamp, Tpid, ip, client.sin_port, command);
+    fflush(FileDescLog);
+    printf("Numero caratteri scritti: %d", n);
+
 
 #ifdef WIN32
     LeaveCriticalSection(&FileLock);
@@ -492,7 +500,7 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
     // TODO: pthread exit critical
 #endif
 
-    
+
 }
 
 void closeLog() {
@@ -526,12 +534,12 @@ void* Accept(void* rank) {
     Tpid = GetCurrentThreadId();
     #else
     // TODO: pthread thread id
-    Tpid = -1;
+    Tpid = syscall(__NR_gettid);
     #endif
 
 
     while (1) {
-        
+
         // i thread vanno a dormire
         #ifdef _WIN32
         EnterCriticalSection(&CritSec);
@@ -636,7 +644,7 @@ int Autenticazione(SOCKET socket_descriptor) {
   Send(socket_descriptor, "200"); // nonce accettato
 
   printf("\nClient Accettato\n");
-  
+
 
   return 0;
 }
@@ -647,7 +655,7 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
   char* brkt = NULL;
 
   Recv(socket_descriptor, command);
-  
+
   Strcpy(dup_cmd, 1024, command);
 
   command = strtok_r(command, " ", &brkt);
@@ -687,7 +695,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
         n = snprintf(NULL, 0, "%llu %ls\r\n", size, file.c_str()) + 1; // taglia l'ultimo carattere
         buffer = (char*)Calloc(n, sizeof(char));
         snprintf(buffer, n, "%llu %ls\r\n", size, file.c_str());
-        
+
         #else
         n = asprintf(&buffer, "%llu %s\r\n", size, file.c_str());
         #endif
@@ -708,7 +716,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
         #endif
 
         Free(buffer, strlen(buffer));
-    
+
     }
 
     records = (char*)realloc(records, strlen(records) + sizeof(" \r\n.\r\n"));
