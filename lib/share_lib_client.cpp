@@ -340,7 +340,9 @@ void SharedLibClient::LSF(){
   char* ls = (char*)Calloc(1024, sizeof(char));
   char* status = (char*)Calloc(1024, sizeof(char));
   char* command = (char*)Calloc(1024, sizeof(char));
+
   snprintf(command, 1024, "LSF %s", this->parametri.lsf);
+
   this->Send_Recv(status, command);
   if (strncmp(status, "300", 3) != 0){
     printf("Errore nell'esecuzione di LSF\n");

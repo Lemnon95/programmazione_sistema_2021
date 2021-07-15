@@ -25,9 +25,9 @@
 
 // alias per funzione di linux
 #define strtok_r strtok_s
+
 // win32 condition variable
 inline CONDITION_VARIABLE Threadwait;
-
 inline CRITICAL_SECTION CritSec;
 #else
 #include <sys/socket.h>
@@ -120,7 +120,7 @@ void closeLog();
 void* Accept(void* rank);
 int Autenticazione(SOCKET socket_descriptor);
 void GestioneComandi(SOCKET socket_descriptor);
-void LSF(char* path, SOCKET socket_descriptor);
+void LSF(SOCKET socket_descriptor, char* path);
 
 // send-recv Wrapper
 void Send(SOCKET soc, const char* str);

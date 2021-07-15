@@ -99,7 +99,7 @@ void SharedLibServer(int argc, char* argv[]) {
                 ShowErr("parametro -c incompleto");
             }
 
-            parametri.configPath = (char*)Calloc(sizeof(argv[argc + 1])+1, sizeof(char));
+            parametri.configPath = (char*)Calloc(sizeof(argv[argc + 1]) +1, sizeof(char));
             parametri.configPath = argv[argc + 1];
 
         }
@@ -615,35 +615,72 @@ int Autenticazione(SOCKET socket_descriptor) {
 
 void GestioneComandi(SOCKET socket_descriptor) {
   char* command = (char*)Calloc(1024, sizeof(char));
-  Recv(socket_descriptor, command);
   char* brkt = NULL;
+
+  Recv(socket_descriptor, command);
+  
   command = strtok_r(command, " ", &brkt);
-  if (strcmp(command, "LSF") == 0) {
+  if (strncmp(command, "LSF", 3) == 0) {
     command = strtok_r(NULL, " ", &brkt);
-    LSF(command, socket_descriptor);
+    LSF(socket_descriptor, command);
   }
 }
 
-void LSF(char* path, SOCKET socket_descriptor) {
-  if (!(std::filesystem::exists(path))){
-    Send(socket_descriptor, "400");
-    return;
-  }
-  char* records = (char*)Calloc(1, sizeof(char));
-  char* buffer = NULL;
-  int n;
-  printf("Prima del for\n");
-  for (auto& p: std::filesystem::directory_iterator(path, std::filesystem::directory_options::skip_permission_denied)) {
-    printf("dentro for\n");
-    if (p.is_directory())
-      continue;
-    n = asprintf(&buffer, "%lu %s\r\n", std::filesystem::file_size(p.path()), p.path().c_str());
-    records = (char*)realloc(records, strlen(records)+ n);
-    strncat(records, buffer, n);
-  }
-  records = (char*)realloc(records, strlen(records)+ strlen(" \r\n.\r\n"));
-  strncat(records, " \r\n.\r\n", strlen(" \r\n.\r\n"));
-  printf("Lungezza record: %ld", strlen(records));
+void LSF(SOCKET socket_descriptor, char* path) {
+    if (!std::filesystem::exists(path)){
+        Send(socket_descriptor, "400");
+        return;
+    }
+    char* records = (char*)Calloc(1, sizeof(char));
+    char* buffer = NULL;
+    int n = 0;
+
+    for (auto& p : std::filesystem::directory_iterator(path, std::filesystem::directory_options::skip_permission_denied)) {
+
+        if (p.is_directory()) continue;
+
+        std::filesystem::path file = p.path();
+        uintmax_t size = std::filesystem::file_size(file);
+
+
+        #ifdef WIN32
+
+        n = snprintf(NULL, 0, "%llu %ls\r\n", size, file.c_str()) + 1; // taglia l'ultimo carattere
+        buffer = (char*)Calloc(n, sizeof(char));
+        snprintf(buffer, n, "%llu %ls\r\n", size, file.c_str());
+        
+        #else
+        n = asprintf(&buffer, "%llu %s\r\n", size, file.c_str());
+        #endif
+
+        int q = strlen(records);
+        records = (char*)realloc(records, (q + n));
+        if (records == NULL) {
+            ShowErr("Impossibile allocare memoria per i file della funzione LSF");
+        }
+
+        #ifdef WIN32
+        strcat_s(records, strlen(records)+n, buffer);
+        if (errno) {
+            ShowErr("Errore in strcat dentro LSF");
+        }
+        #else
+        strncat(records, buffer, n);
+        #endif
+
+        Free(buffer, strlen(buffer));
+    
+    }
+
+    records = (char*)realloc(records, strlen(records) + sizeof(" \r\n.\r\n"));
+
+    #ifdef WIN32
+    strcat_s(records, strlen(records) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
+    #else
+    strncat(records, " \r\n.\r\n", strlen(" \r\n.\r\n"));
+    #endif
+
+    printf("Lungezza record: %lld", strlen(records));
 }
 
 void Send(SOCKET soc, const char* str) {
