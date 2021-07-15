@@ -697,7 +697,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
         snprintf(buffer, n, "%llu %ls\r\n", size, file.c_str());
 
         #else
-        n = asprintf(&buffer, "%llu %s\r\n", size, file.c_str());
+        n = asprintf(&buffer, "%llu %s\r\n", size, file.c_str())+1;
         #endif
 
         int q = strlen(records);
@@ -712,7 +712,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
             ShowErr("Errore in strcat dentro LSF");
         }
         #else
-        strncat(records, buffer, n);
+        strcat(records, buffer);
         #endif
 
         Free(buffer, strlen(buffer));
@@ -724,7 +724,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
     #ifdef WIN32
     strcat_s(records, strlen(records) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
     #else
-    strncat(records, " \r\n.\r\n", strlen(" \r\n.\r\n"));
+    strncat(records, " \r\n.\r\n", sizeof(" \r\n.\r\n")+1);
     #endif
 
     //printf("Lungezza record: %lld", strlen(records));
