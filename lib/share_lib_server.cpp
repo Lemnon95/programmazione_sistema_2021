@@ -664,7 +664,7 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
     }
   }
   else if (strncmp(command, "EXEC", 4) == 0) {
-      command = strtok_r(NULL, " ", &brkt);
+      command = strtok_r(NULL, "", &brkt);
       if (EXEC(socket_descriptor, command) == 0) {
           writeLog(Tpid, socket_descriptor, dup_cmd);
       }
@@ -741,7 +741,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
 int EXEC(SOCKET socket_descriptor, char* cmd) {
     Send(socket_descriptor, "300");
     char* result = _exec(cmd);
-    printf("\n%s\n", result);
+
     SendAll(socket_descriptor, result);
 
     //TODO: Free
@@ -751,23 +751,22 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
 
 char* _exec(const char* cmd) {
+    printf("\nCOMANDO: %s\n",cmd);
     FILE* pipe = popen(cmd, "r");
     if (!pipe) ShowErr("popen() failed!");
     
-    char buffer[1024];
+    char buffer[128] = {0};
     char* result = (char*)Calloc(1, sizeof(char));
 
-    int x = 0;
-
     try {
-        while (fgets(buffer, sizeof buffer, pipe) != NULL) {
+        while (fgets(buffer, sizeof(buffer)-1, pipe) != NULL) {
 
-            result = (char*)realloc(result, (x + 1) * 1024);
+            result = (char*)realloc(result, strlen(result)+strlen(buffer)+1 );
             if (result == NULL) {
                 ShowErr("Impossibile allocare memoria per _exec");
             }
-            memcpy(result + (x * 1024), buffer, 1024);
-            x++;
+            strcat_s(result, strlen(result) + strlen(buffer) + 1, buffer);
+            //memcpy(result + strlen(result), buffer, strlen(buffer));
         }
     }
     catch (...) {
@@ -784,6 +783,12 @@ char* _exec(const char* cmd) {
 #endif
         return _t;
     }
+
+#ifdef WIN32
+    strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
+#else
+    strncat(result, " \r\n.\r\n", sizeof(" \r\n.\r\n") );
+#endif
 
     return result;
 }

@@ -365,8 +365,6 @@ void SharedLibClient::EXEC() {
     char* command = (char*)Calloc(1024, sizeof(char));
     char* status = (char*)Calloc(1024, sizeof(char));
 
-    printf("EXEC %s", this->parametri.exec);
-
 
     snprintf(command, 1024, "EXEC %s", this->parametri.exec);
     this->Send_Recv(status, command);
@@ -378,11 +376,11 @@ void SharedLibClient::EXEC() {
 
     char* ans = this->ReadAll();
 
-    printf("%s\n", ans);
+    printf("\n%s\n", ans);
 }
 
 char* SharedLibClient::ReadAll(){
-  char* buffer_recv = (char*)Calloc(1025, sizeof(char));
+  char* buffer_recv = (char*)Calloc(1024, sizeof(char));
   char* ans = (char*)Calloc(1, sizeof(char));
   int x = 0;
 
