@@ -667,7 +667,7 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
   // altri comandi
 
 
-
+  Free(dup_cmd, strlen(dup_cmd)+1);
   //Free(command, strlen(command)+1);
 }
 
@@ -676,6 +676,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
         Send(socket_descriptor, "400");
         return 1;
     }
+    Send(socket_descriptor, "300");
     char* records = (char*)Calloc(1, sizeof(char));
     char* buffer = NULL;
     int n = 0;
@@ -714,7 +715,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
         #endif
 
         Free(buffer, strlen(buffer));
-
+        
     }
 
     records = (char*)realloc(records, strlen(records) + sizeof(" \r\n.\r\n"));
@@ -725,8 +726,30 @@ int LSF(SOCKET socket_descriptor, char* path) {
     strncat(records, " \r\n.\r\n", sizeof(" \r\n.\r\n")+1);
     #endif
 
-    //printf("Lungezza record: %lld", strlen(records));
+    SendAll(socket_descriptor, records);
+
+
+    Free(records, strlen(records)+1);
     return 0;
+}
+
+void SendAll(SOCKET soc, const char* str) {
+    if (str == NULL) {
+        return;
+    }
+    int size = strlen(str) + 1;
+    int point = 0;
+    char* buffer = (char*)Calloc(1024, sizeof(char));
+    while ((point*1024) < size) {
+        
+        memcpy(buffer, str + (point * 1024), 1024);
+        Send(soc, buffer);
+        point++;
+
+    }
+
+    Send(soc, "");
+
 }
 
 void Send(SOCKET soc, const char* str) {

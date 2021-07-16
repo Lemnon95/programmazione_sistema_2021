@@ -259,6 +259,7 @@ void SharedLibClient::Send(const char* str) {
 }
 
 void SharedLibClient::Recv(char* _return) {
+    memset(_return, '\0', 1024);
     char _t[1024] = { 0 };
     if (recv(this->socketClient, _t, 1024, 0) < 0) {
         ShowErr("Errore nel ricevere un messaggio dal server");
@@ -344,12 +345,15 @@ void SharedLibClient::LSF(){
   snprintf(command, 1024, "LSF %s", this->parametri.lsf);
 
   this->Send_Recv(status, command);
+
   if (strncmp(status, "300", 3) != 0){
     printf("Errore nell'esecuzione di LSF\n");
     return;
   }
+
   char* ans = this->ReadAll();
-  printf("Ans is: %s", ans);
+
+  printf("%s\n", ans);
 
 }
 
@@ -357,17 +361,17 @@ char* SharedLibClient::ReadAll(){
   char* buffer_recv = (char*)Calloc(1024, sizeof(char));
   char* ans = (char*)Calloc(1, sizeof(char));
   int x = 0;
+
   while (true) {
     this->Recv(buffer_recv);
-    if (strlen(buffer_recv) != 0) {
-      ans = (char*)realloc(ans, (x+1)*1024);
-      memcpy(ans+(x*1024), buffer_recv, 1024);
-      x++;
-    }
-    else {
-      break;
-    }
+
+    if (strlen(buffer_recv) == 0) break;
+    
+    ans = (char*)realloc(ans, (x + 1) * 1024);
+    memcpy(ans + (x * 1024), buffer_recv, 1024);
+    x++;
   }
+
   return ans;
 }
 
