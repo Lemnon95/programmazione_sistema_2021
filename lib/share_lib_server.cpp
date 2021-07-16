@@ -602,9 +602,12 @@ void* Accept(void* rank) {
         GestioneComandi(socket_descriptor, Tpid);
 
     }
+#ifdef __linux__
     chiusura++;
     pid_t x = syscall(__NR_gettid);
     printf("Exit Thread number: %d\n", x);
+#endif
+
     return NULL;
 }
 
@@ -783,7 +786,10 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         return 1;
 
     }
-
+    else {
+        Send(socket_descriptor, "300");
+    }
+    char* result = NULL;
     
     // copy
     if (strcmp(command, "copy") == 0) {
@@ -806,12 +812,6 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             return 1;
         }
 
-        // copy path1 path2
-        if (i == 2 && std::filesystem::exists(list[i-1])) {
-            Send(socket_descriptor, "400");
-            return 1;
-        }
-
         // copy path1 path2 path3
         if (i > 2 && !std::filesystem::is_directory(list[i-1])) {
             Send(socket_descriptor, "400");
@@ -820,19 +820,31 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
         // copy path1 path2  ||  copy path1 path2 dir1
         for (int k = 0; k < i-1; k++) {
-            if (std::filesystem::copy_file(list[k], list[i-1])) {
-                printf("copiato %s", list[k]);
+            if (!std::filesystem::copy_file(list[k], list[i-1], std::filesystem::copy_options::skip_existing)) {
+                
             }
         }
 
     }
 
-    Send(socket_descriptor, "300");
+    // printworkdir
+    if (strcmp(command, "printworkdir") == 0) {
+        #ifdef WIN32
+        int n = snprintf(NULL, 0, "%ls", std::filesystem::current_path().c_str());
+        result = (char*)Calloc(n + 1, sizeof(char));
+        sprintf_s(result, n + 1, "%ls", std::filesystem::current_path().c_str());
+        #else
+        asprintf(&result, "%ls", std::filesystem::current_path().c_str());
+        #endif
+
+    }
+
+    
     //char* result = _exec(cmd);
 
-    //SendAll(socket_descriptor, result);
+    SendAll(socket_descriptor, result);
 
-    //Free(result, 0);
+
 
     return 0;
 }
