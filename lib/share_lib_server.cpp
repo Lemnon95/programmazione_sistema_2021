@@ -345,11 +345,13 @@ void spawnSockets() {
         // TODO: ricordarsi di fare il destroy
         if (pthread_create(&threadChild[(long)q], NULL, Accept, (void*)T_s) != 0)
             printf("Failed to create thread\n");
-        // spawno anche il thread che gestisce i segnali:
-        if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
-            printf("Failed to create signal handling thread\n");
         #endif
     }
+    #ifdef __linux__
+    // spawno anche il thread che gestisce i segnali:
+    if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
+        printf("Failed to create signal handling thread\n");
+    #endif
 
 
     // impostazioni base del server
@@ -531,7 +533,9 @@ void* SigHandler (void* dummy){
   sigaddset(&sigset, SIGHUP);
   sigaddset(&sigset, SIGINT);
   while (1) {
+    printf("inside handler before\n");
     signum = sigwaitinfo(&sigset, NULL);
+    printf("inside handler after\n");
     CloseServer();
   }
   return NULL;
@@ -598,7 +602,9 @@ void* Accept(void* rank) {
         GestioneComandi(socket_descriptor, Tpid);
 
     }
-
+    chiusura++;
+    pid_t x = syscall(__NR_gettid);
+    printf("Exit Thread number: %d\n", x);
     return NULL;
 }
 
@@ -1027,7 +1033,7 @@ void Free(void* arg, int size) {
         memset(arg, '\0', size);
     }
 
-    
+
     free(arg);
 
 }
