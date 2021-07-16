@@ -47,9 +47,11 @@ inline CRITICAL_SECTION FileLock;
 inline pthread_mutex_t mutex;
 inline pthread_cond_t cond_var;
 inline pthread_t* threadChild = NULL;
+inline pthread_t thread_handler;
 inline bool wake_one = true;
 inline bool esci = false;
 inline int chiusura = 0;
+inline int signum;
 // alias di WinSock per la chiusura del socket
 #define closesocket close
 #define SOCKET int
@@ -151,7 +153,6 @@ void Free(void * arg, int size);
 // strcpy Wrapper
 void Strcpy(char* dest, unsigned int size, const char* src);
 
-/* Handler SIGHUP */
 #ifdef __linux__
-void my_handler(int s);
-#endif // __linux__
+void* SigHandler (void* dummy);
+#endif
