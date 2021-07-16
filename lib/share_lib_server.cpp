@@ -345,6 +345,9 @@ void spawnSockets() {
         // TODO: ricordarsi di fare il destroy
         if (pthread_create(&threadChild[(long)q], NULL, Accept, (void*)T_s) != 0)
             printf("Failed to create thread\n");
+        // spawno anche il thread che gestisce i segnali:
+        if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
+            printf("Failed to create signal handling thread\n");
         #endif
     }
 
@@ -411,8 +414,15 @@ void beginServer() {
 
     }
 
-    // terminazione programma
-    CloseServer();
+    // terminazione programma (sigint) o restart (sighup)
+    esci = true;
+    pthread_mutex_lock(&mutex);
+    pthread_cond_broadcast(&cond_var);
+    pthread_mutex_unlock(&mutex);
+    for (long i = 0; i < parametri.nthread; i++) {
+      pthread_join(threadChild[i], NULL);
+    }
+
 
 }
 
@@ -513,12 +523,27 @@ void closeLog() {
 
 //////////////////////////////////////////////////////////////////////////////////
 
+//funzione per il thread dedicato a gestire i segnali
+void* SigHandler (void* dummy){
+  sigset_t sigset;
+  sigemptyset(&sigset);
+  sigaddset(&sigset, SIGHUP);
+  sigaddset(&sigset, SIGINT);
+  while (1) {
+    signum = sigwaitinfo(&sigset, NULL);
+    CloseServer();
+  }
+  return NULL;
+}
+
+
 // Dopo che un thread viene creato esegue questa funzione
 void* Accept(void* rank) {
     #ifdef __linux__
     sigset_t sigset;
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGHUP);
+    sigaddset(&sigset, SIGINT);
     pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
     #endif
     // inizializzo rand
@@ -535,7 +560,6 @@ void* Accept(void* rank) {
     Tpid = syscall(__NR_gettid);
     #endif
 
-
     while (1) {
 
         // i thread vanno a dormire
@@ -551,7 +575,6 @@ void* Accept(void* rank) {
             chiusura++;
             pid_t x = syscall(__NR_gettid);
             printf("Exit Thread number: %d\n", x);
-            pthread_cond_signal(&cond_var);
             pthread_mutex_unlock(&mutex);
             return NULL;
           }
@@ -719,7 +742,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
         #endif
 
         Free(buffer, strlen(buffer));
-        
+
     }
 
     records = (char*)realloc(records, strlen(records) + sizeof(" \r\n.\r\n"));
@@ -753,7 +776,7 @@ char* _exec(const char* cmd) {
 
     FILE* pipe = popen(cmd, "r");
     if (!pipe) ShowErr("popen() failed!");
-    
+
     char buffer[128] = {0};
     char* result = (char*)Calloc(1, sizeof(char));
 
@@ -811,7 +834,7 @@ void SendAll(SOCKET soc, const char* str) {
     int point = 0;
     char* buffer = (char*)Calloc(1024, sizeof(char));
     while ((point*1024) < size) {
-        
+
         memcpy(buffer, str + (point * 1024), 1024);
         Send(soc, buffer);
         point++;
