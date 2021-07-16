@@ -328,6 +328,8 @@ void SharedLibClient::Trasmissione() {
 #ifdef _DEBUG
     printf("\nConnessione OK\n");
 #endif
+
+
 }
 
 void SharedLibClient::GestioneComandi () {
@@ -347,32 +349,38 @@ void SharedLibClient::LSF(){
     snprintf(command, 1024, "LSF %s", this->parametri.lsf);
 
     this->Send_Recv(status, command);
-
-    // TODO: Free 
+ 
+    Free(command, 1024);
 
     if (strncmp(status, "300", 3) != 0){
+        Free(status, 1024);
+        
         printf("Errore nell'esecuzione di LSF\n");
         return;
     }
+    Free(status, 1024);
 
     char* ans = this->ReadAll();
 
     printf("%s\n", ans);
-    
+    Free(ans, strlen(ans));
 }
 
 void SharedLibClient::EXEC() {
     char* command = (char*)Calloc(1024, sizeof(char));
     char* status = (char*)Calloc(1024, sizeof(char));
 
-
     snprintf(command, 1024, "EXEC %s", this->parametri.exec);
     this->Send_Recv(status, command);
 
+    Free(command, 1024);
+
     if (strncmp(status, "300", 3) != 0) {
+        Free(status, 1024);
         printf("Errore nell'esecuzione di LSF\n");
         return;
     }
+    Free(status, 1024);
 
     char* ans = this->ReadAll();
 

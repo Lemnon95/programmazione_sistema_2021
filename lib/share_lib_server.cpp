@@ -672,8 +672,7 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
   // altri comandi
 
 
-  Free(dup_cmd, strlen(dup_cmd)+1);
-  //Free(command, strlen(command)+1);
+  Free(dup_cmd, strlen(dup_cmd));
 }
 
 int LSF(SOCKET socket_descriptor, char* path) {
@@ -744,14 +743,14 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
     SendAll(socket_descriptor, result);
 
-    //TODO: Free
+    //Free(result, 0);
 
     return 0;
 }
 
 
 char* _exec(const char* cmd) {
-    printf("\nCOMANDO: %s\n",cmd);
+
     FILE* pipe = popen(cmd, "r");
     if (!pipe) ShowErr("popen() failed!");
     
@@ -765,8 +764,13 @@ char* _exec(const char* cmd) {
             if (result == NULL) {
                 ShowErr("Impossibile allocare memoria per _exec");
             }
+#ifdef WIN32
             strcat_s(result, strlen(result) + strlen(buffer) + 1, buffer);
-            //memcpy(result + strlen(result), buffer, strlen(buffer));
+#else
+            strcat(result, buffer);
+#endif
+
+
         }
     }
     catch (...) {
@@ -775,6 +779,8 @@ char* _exec(const char* cmd) {
     int i = pclose(pipe);
 
     if (i != 0) {
+        Free(result, strlen(result));
+
         char* _t = (char*)Calloc(100, sizeof(char));
 #ifdef WIN32
         sprintf_s(_t, 100, "%d", i);
@@ -811,7 +817,7 @@ void SendAll(SOCKET soc, const char* str) {
         point++;
 
     }
-
+    Free(buffer, 1024);
     Send(soc, "");
 
 }
@@ -934,11 +940,11 @@ void Free(void* arg, int size) {
         ShowErr("variabile data a Free() è NULL\n");
     }
 
-    if (size == 0) {
-        ShowErr("Free(_, 0) impossibile svuotare variabile di lunghezza 0");
+    if (size != 0) {
+        memset(arg, '\0', size);
     }
 
-    memset(arg, '\0', size);
+    
     free(arg);
 
 }

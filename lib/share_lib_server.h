@@ -147,7 +147,7 @@ void* Calloc(unsigned long int nmemb, unsigned long int size);
 // fprintf Wrapper
 void ShowErr(const char* str);
 // free Wrapper
-void Free(void * arg, int size);
+void Free(void * arg, int size=0);
 // strcpy Wrapper
 void Strcpy(char* dest, unsigned int size, const char* src);
 
