@@ -147,7 +147,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
     }
 
     if (this->parametri.server.sin_addr.s_addr == 0) {
-        ShowErr("indirizzo ip mancante");
+        ShowErr("indirizzo ip mancante (-h)");
     }
 
 
@@ -168,7 +168,11 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
     this->T_c = this->generateToken("Immetti passphrase del client (max 254): ");
 
-    printf("\nT_s: %lu\nT_c: %lu\n",this->T_s,this->T_c);
+#ifdef _DEBUG
+    printf("\nT_s: %lu\nT_c: %lu\n", this->T_s, this->T_c);
+#endif // _DEBUG
+
+    
 
 }
 
@@ -196,8 +200,6 @@ void SharedLibClient::Connect() {
 
 
     if (connect(this->socketClient, (sockaddr*)&(this->parametri.server), sizeof(this->parametri.server)) < 0) {
-
-        //wprintf(L"connect function failed with error: %ld\n", WSAGetLastError());
         this->clearSocket();
         ShowErr("Impossibile connettersi al server");
     }
@@ -232,8 +234,7 @@ unsigned long int SharedLibClient::generateToken(const char* printText) {
 }
 
 unsigned long int SharedLibClient::hashToken(char* token) {
-
-
+    
     unsigned long int k = 5381;
     // hashing
     // stessa phrase stresso hash
@@ -260,12 +261,10 @@ void SharedLibClient::Send(const char* str) {
 
 void SharedLibClient::Recv(char* _return) {
     memset(_return, '\0', 1024);
-    char _t[1024] = { 0 };
-    if (recv(this->socketClient, _t, 1024, 0) < 0) {
+    if (recv(this->socketClient, _return, 1024, 0) < 0) {
         ShowErr("Errore nel ricevere un messaggio dal server");
     }
 
-    Strcpy(_return, 1024, _t);
 }
 
 void SharedLibClient::Send_Recv(char* _return, const char* str, char* status) {
@@ -324,41 +323,66 @@ void SharedLibClient::Trasmissione() {
     // passo 6
     this->Send_Recv(status, authmsg);
 
-    if (strncmp(status, "200", 3) != 0) {
-        ShowErr("Auth errato");
-    }
+    if (strncmp(status, "200", 3) != 0) ShowErr("Auth errato");
 
+#ifdef _DEBUG
     printf("\nConnessione OK\n");
+#endif
 }
 
 void SharedLibClient::GestioneComandi () {
   if (this->parametri.lsf != NULL) {
-    this->LSF();
+      this->LSF();
+  }
+  if (this->parametri.exec != NULL) {
+      this->EXEC();
   }
 }
 
 void SharedLibClient::LSF(){
-  char* ls = (char*)Calloc(1024, sizeof(char));
-  char* status = (char*)Calloc(1024, sizeof(char));
-  char* command = (char*)Calloc(1024, sizeof(char));
 
-  snprintf(command, 1024, "LSF %s", this->parametri.lsf);
+    char* status = (char*)Calloc(1024, sizeof(char));
+    char* command = (char*)Calloc(1024, sizeof(char));
 
-  this->Send_Recv(status, command);
+    snprintf(command, 1024, "LSF %s", this->parametri.lsf);
 
-  if (strncmp(status, "300", 3) != 0){
-    printf("Errore nell'esecuzione di LSF\n");
-    return;
-  }
+    this->Send_Recv(status, command);
 
-  char* ans = this->ReadAll();
+    // TODO: Free 
 
-  printf("%s\n", ans);
+    if (strncmp(status, "300", 3) != 0){
+        printf("Errore nell'esecuzione di LSF\n");
+        return;
+    }
 
+    char* ans = this->ReadAll();
+
+    printf("%s\n", ans);
+    
+}
+
+void SharedLibClient::EXEC() {
+    char* command = (char*)Calloc(1024, sizeof(char));
+    char* status = (char*)Calloc(1024, sizeof(char));
+
+    printf("EXEC %s", this->parametri.exec);
+
+
+    snprintf(command, 1024, "EXEC %s", this->parametri.exec);
+    this->Send_Recv(status, command);
+
+    if (strncmp(status, "300", 3) != 0) {
+        printf("Errore nell'esecuzione di LSF\n");
+        return;
+    }
+
+    char* ans = this->ReadAll();
+
+    printf("%s\n", ans);
 }
 
 char* SharedLibClient::ReadAll(){
-  char* buffer_recv = (char*)Calloc(1024, sizeof(char));
+  char* buffer_recv = (char*)Calloc(1025, sizeof(char));
   char* ans = (char*)Calloc(1, sizeof(char));
   int x = 0;
 
@@ -368,6 +392,10 @@ char* SharedLibClient::ReadAll(){
     if (strlen(buffer_recv) == 0) break;
     
     ans = (char*)realloc(ans, (x + 1) * 1024);
+    if (ans == NULL) {
+        ShowErr("Impossibile allocare memoria per il ReadAll");
+    }
+
     memcpy(ans + (x * 1024), buffer_recv, 1024);
     x++;
   }

@@ -65,6 +65,7 @@ private:
 	void clearSocket();
 	void GestioneComandi();
 	void LSF();
+	void EXEC();
 	char* ReadAll();
 };
 

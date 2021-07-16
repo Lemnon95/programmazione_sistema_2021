@@ -663,7 +663,12 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
         writeLog(Tpid, socket_descriptor, dup_cmd);
     }
   }
-
+  else if (strncmp(command, "EXEC", 4) == 0) {
+      command = strtok_r(NULL, " ", &brkt);
+      if (EXEC(socket_descriptor, command) == 0) {
+          writeLog(Tpid, socket_descriptor, dup_cmd);
+      }
+  }
   // altri comandi
 
 
@@ -733,10 +738,64 @@ int LSF(SOCKET socket_descriptor, char* path) {
     return 0;
 }
 
+int EXEC(SOCKET socket_descriptor, char* cmd) {
+    Send(socket_descriptor, "300");
+    char* result = _exec(cmd);
+    printf("\n%s\n", result);
+    SendAll(socket_descriptor, result);
+
+    //TODO: Free
+
+    return 0;
+}
+
+
+char* _exec(const char* cmd) {
+    FILE* pipe = popen(cmd, "r");
+    if (!pipe) ShowErr("popen() failed!");
+    
+    char buffer[1024];
+    char* result = (char*)Calloc(1, sizeof(char));
+
+    int x = 0;
+
+    try {
+        while (fgets(buffer, sizeof buffer, pipe) != NULL) {
+
+            result = (char*)realloc(result, (x + 1) * 1024);
+            if (result == NULL) {
+                ShowErr("Impossibile allocare memoria per _exec");
+            }
+            memcpy(result + (x * 1024), buffer, 1024);
+            x++;
+        }
+    }
+    catch (...) {
+        ;
+    }
+    int i = pclose(pipe);
+
+    if (i != 0) {
+        char* _t = (char*)Calloc(100, sizeof(char));
+#ifdef WIN32
+        sprintf_s(_t, 100, "%d", i);
+#else
+        sprintf(_t, "%d", i);
+#endif
+        return _t;
+    }
+
+    return result;
+}
+
+
+
+
 void SendAll(SOCKET soc, const char* str) {
     if (str == NULL) {
         return;
     }
+
     int size = strlen(str) + 1;
     int point = 0;
     char* buffer = (char*)Calloc(1024, sizeof(char));
@@ -764,13 +823,10 @@ void Send(SOCKET soc, const char* str) {
 }
 
 void Recv(SOCKET soc, char* _return) {
-    char* _t = (char*)Calloc(1024, sizeof(char));
-    if (recv(soc, _t, 1024, 0) < 0) {
+    if (recv(soc, _return, 1024, 0) < 0) {
         ShowErr("Errore nel ricevere un messaggio dal client");
     }
 
-    Strcpy(_return, 1024, _t);
-    Free(_t, 1024);
 }
 
 void Send_Recv(SOCKET soc, char* _return, const char* str, const char* status) {

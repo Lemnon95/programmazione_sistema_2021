@@ -25,6 +25,8 @@
 
 // alias per funzione di linux
 #define strtok_r strtok_s
+#define popen _popen
+#define pclose _pclose
 
 // win32 condition variable
 inline CONDITION_VARIABLE Threadwait;
@@ -124,6 +126,8 @@ void* Accept(void* rank);
 int Autenticazione(SOCKET socket_descriptor);
 void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid);
 int LSF(SOCKET socket_descriptor, char* path);
+int EXEC(SOCKET socket_descriptor, char* cmd);
+char* _exec(const char* cmd);
 
 // send-recv Wrapper
 void SendAll(SOCKET soc, const char* str);
