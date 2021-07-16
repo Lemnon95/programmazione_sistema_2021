@@ -414,6 +414,7 @@ void beginServer() {
 
     }
 
+#ifdef __linux__
     // terminazione programma (sigint) o restart (sighup)
     esci = true;
     pthread_mutex_lock(&mutex);
@@ -422,7 +423,7 @@ void beginServer() {
     for (long i = 0; i < parametri.nthread; i++) {
       pthread_join(threadChild[i], NULL);
     }
-
+#endif
 
 }
 
@@ -522,7 +523,7 @@ void closeLog() {
 }
 
 //////////////////////////////////////////////////////////////////////////////////
-
+#ifdef __linux__
 //funzione per il thread dedicato a gestire i segnali
 void* SigHandler (void* dummy){
   sigset_t sigset;
@@ -535,7 +536,7 @@ void* SigHandler (void* dummy){
   }
   return NULL;
 }
-
+#endif
 
 // Dopo che un thread viene creato esegue questa funzione
 void* Accept(void* rank) {
@@ -761,10 +762,69 @@ int LSF(SOCKET socket_descriptor, char* path) {
 }
 
 int EXEC(SOCKET socket_descriptor, char* cmd) {
-    Send(socket_descriptor, "300");
-    char* result = _exec(cmd);
 
-    SendAll(socket_descriptor, result);
+    char* command = NULL;
+    char* fin = NULL;
+    command = strtok_r(cmd, " ", &fin);
+
+    if (strcmp(command, "copy") &&
+        strcmp(command, "remove") &&
+        strcmp(command, "whoami") &&
+        strcmp(command, "printworkdir") &&
+        strcmp(command, "sort")) {
+
+        Send(socket_descriptor, "400");
+        return 1;
+
+    }
+
+    
+    // copy
+    if (strcmp(command, "copy") == 0) {
+        char* _t = NULL;
+        char** list = (char**)Calloc(1, sizeof(char*)); // lista di stringhe
+        int i = 0;
+        while ((_t = strtok_r(NULL, " ", &fin)) != NULL) {
+
+            list[i] = (char*)Calloc(strlen(_t)+1, sizeof(char));
+            Strcpy(list[i], strlen(_t)+1, _t);
+            i++;
+            list = (char**)realloc(list, (i+1)* sizeof(char**));
+            if (list == NULL) {
+                ShowErr("Errore nell'allocare lista in EXEC comando copy");
+            }
+        }
+        // copy  || copy path1
+        if (i < 2) {
+            Send(socket_descriptor, "400");
+            return 1;
+        }
+
+        // copy path1 path2
+        if (i == 2 && std::filesystem::exists(list[i-1])) {
+            Send(socket_descriptor, "400");
+            return 1;
+        }
+
+        // copy path1 path2 path3
+        if (i > 2 && !std::filesystem::is_directory(list[i-1])) {
+            Send(socket_descriptor, "400");
+            return 1;
+        }
+
+        // copy path1 path2  ||  copy path1 path2 dir1
+        for (int k = 0; k < i-1; k++) {
+            if (std::filesystem::copy_file(list[k], list[i-1])) {
+                printf("copiato %s", list[k]);
+            }
+        }
+
+    }
+
+    Send(socket_descriptor, "300");
+    //char* result = _exec(cmd);
+
+    //SendAll(socket_descriptor, result);
 
     //Free(result, 0);
 
