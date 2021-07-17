@@ -397,8 +397,8 @@ char* SharedLibClient::ReadAll(){
 
     if (strlen(buffer_recv) == 0) break;
     
-    ans = (char*)realloc(ans, (x + 1) * 1024);
-    if (ans == NULL) {
+    
+    if ((ans = (char*)realloc(ans, (x + 1) * 1024)) == NULL) {
         ShowErr("Impossibile allocare memoria per il ReadAll");
     }
 

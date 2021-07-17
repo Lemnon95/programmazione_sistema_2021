@@ -482,12 +482,11 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
     char time_stamp[80];
     if (time(&rawtime) < 0) ShowErr("Impossibile ottenere il tempo della macchina");
 
-    #ifdef _WIN32
-    localtime_s(&timeinfo ,&rawtime);
+    #ifdef WIN32
+    localtime_s(&timeinfo, &rawtime);
     #else //__linux___
     localtime_r(&rawtime, &timeinfo);
     #endif
-
     if (errno) ShowErr("Impossibile convertire il tempo locale");
 
     strftime(time_stamp, sizeof(time_stamp), "%d-%m-%Y %H:%M:%S", &timeinfo);
@@ -626,8 +625,8 @@ int Autenticazione(SOCKET socket_descriptor) {
   unsigned long int challenge = 0;
   unsigned long int challenge_nonce = 0;
 
-  char* endP;
-  char* next_tok;
+  char* endP = NULL;
+  char* next_tok = NULL;
 
   char _t[1024] = { 0 };
   char _auth[1024] = { 0 };
@@ -733,12 +732,12 @@ int LSF(SOCKET socket_descriptor, char* path) {
         snprintf(buffer, n, "%llu %ls\r\n", size, file.c_str());
 
         #else
-        n = asprintf(&buffer, "%llu %s\r\n", size, file.c_str())+1;
+        n = asprintf(&buffer, "%lu %s\r\n", size, file.c_str())+1;
         #endif
 
         int q = strlen(records);
-        records = (char*)realloc(records, (q + n));
-        if (records == NULL) {
+        
+        if ((records = (char*)realloc(records, (q + n))) == NULL) {
             ShowErr("Impossibile allocare memoria per i file della funzione LSF");
         }
 
@@ -755,7 +754,9 @@ int LSF(SOCKET socket_descriptor, char* path) {
 
     }
 
-    records = (char*)realloc(records, strlen(records) + sizeof(" \r\n.\r\n"));
+    if ((records = (char*)realloc(records, strlen(records) + sizeof(" \r\n.\r\n"))) == NULL) {
+        ShowErr("Impossibile reallocare memoria");
+    }
 
     #ifdef WIN32
     strcat_s(records, strlen(records) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
@@ -786,19 +787,24 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         return 1;
 
     }
-    else {
-        Send(socket_descriptor, "300");
-    }
+
+
     char* result = NULL;
     
     // copy
     if (strcmp(command, "copy") == 0) {
-        char* _t = NULL;
+        int i = 0, n = 0;
+        char* _t = NULL, *buffer = NULL;
         char** list = (char**)Calloc(1, sizeof(char*)); // lista di stringhe
-        int i = 0;
+        
+        result = (char*)Calloc(1, sizeof(char));
+
+
         while ((_t = strtok_r(NULL, " ", &fin)) != NULL) {
 
-            list[i] = (char*)Calloc(strlen(_t)+1, sizeof(char));
+            if ((list[i] = (char*)Calloc(strlen(_t) + 1, sizeof(char))) == NULL) {
+                ShowErr("Impossibile allocare memoria");
+            }
             Strcpy(list[i], strlen(_t)+1, _t);
             i++;
             list = (char**)realloc(list, (i+1)* sizeof(char**));
@@ -818,34 +824,167 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             return 1;
         }
 
+        std::error_code err;
+        std::error_condition ok;
+        
         // copy path1 path2  ||  copy path1 path2 dir1
         for (int k = 0; k < i-1; k++) {
-            if (!std::filesystem::copy_file(list[k], list[i-1], std::filesystem::copy_options::skip_existing)) {
+            if (std::filesystem::exists(list[k]) ){
+                std::filesystem::copy(list[k], list[i - 1], std::filesystem::copy_options::skip_existing, err);
+                if (err != ok) {
+                    Free(list[k], strlen(list[k]));
+                    continue;
+                }
+
+                #ifdef WIN32
+                n = snprintf(NULL, 0, "%s\r\n", list[k]) + 1; // taglia l'ultimo carattere
+                buffer = (char*)Calloc(n, sizeof(char));
+                snprintf(buffer, n, "%s\r\n", list[k]);
+                #else
+                n = asprintf(&buffer, "%s\r\n", list[k]) + 1;
+                #endif
+
                 
+                if ((result = (char*)realloc(result, (strlen(result) + n))) == NULL) {
+                    ShowErr("Impossibile allocare memoria per i file della funzione LSF");
+                }
+
+                #ifdef WIN32
+                strcat_s(result, strlen(result) + n, buffer);
+                if (errno) {
+                    ShowErr("Errore in strcat dentro EXEC");
+                }
+                #else
+                strcat(result, buffer);
+                #endif
+
+                Free(list[k], strlen(list[k]));
+                Free(buffer, strlen(buffer));
             }
         }
+
+        result = (char*)realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
+
+        #ifdef WIN32
+        strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
+        #else
+        strncat(result, " \r\n.\r\n", sizeof(" \r\n.\r\n") + 1);
+        #endif
+
+
+        Send(socket_descriptor, "300");
+        SendAll(socket_descriptor, result);
+
+
+        Free(list, i);
+
+
+    }
+
+    // remove
+    if (strcmp(command, "remove") == 0) {
+        int i = 0, n = 0;
+        char* _t = NULL, *buffer = NULL;
+        char** list = (char**)Calloc(1, sizeof(char*)); // lista di stringhe
+        result = (char*)Calloc(1, sizeof(char));
+        
+
+        while ((_t = strtok_r(NULL, " ", &fin)) != NULL) {
+
+            if ((list[i] = (char*)Calloc(strlen(_t) + 1, sizeof(char))) == NULL) {
+                ShowErr("Impossibile allocare memoria");
+            }
+            Strcpy(list[i], strlen(_t) + 1, _t);
+            i++;
+            list = (char**)realloc(list, (i + 1) * sizeof(char**));
+            if (list == NULL) {
+                ShowErr("Errore nell'allocare lista in EXEC comando remove");
+            }
+        }
+        
+        // remove
+        if (i < 1) {
+            Send(socket_descriptor, "400");
+            return 1;
+        }
+
+
+        // remove <...>
+        for (int k = 0; k < i; k++) {
+            if (std::filesystem::exists(list[k])) {
+                if (!std::filesystem::remove(list[k])) {
+                    Send(socket_descriptor, "400");
+                    return 1;
+                }
+                
+
+                #ifdef WIN32
+                n = snprintf(NULL, 0, "%s\r\n", list[k]) + 1; // taglia l'ultimo carattere
+                buffer = (char*)Calloc(n, sizeof(char));
+                snprintf(buffer, n, "%s\r\n", list[k]);
+                #else
+                n = asprintf(&buffer, "%s\r\n", list[k]) + 1;
+                #endif
+
+                if ((result = (char*)realloc(result, (strlen(result) + n))) == NULL) {
+                    ShowErr("Impossibile allocare memoria per i file della funzione LSF");
+                }
+
+                #ifdef WIN32
+                strcat_s(result, strlen(result) + n, buffer);
+                if (errno) {
+                    ShowErr("Errore in strcat dentro EXEC");
+                }
+                #else
+                strcat(result, buffer);
+                #endif
+
+                Free(buffer, strlen(buffer));
+                Free(list[k], strlen(list[k]));
+
+            }
+        }
+
+        result = (char*)realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
+
+#ifdef WIN32
+        strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
+#else
+        strcat(result, " \r\n.\r\n");
+#endif
+
+
+        Send(socket_descriptor, "300");
+        SendAll(socket_descriptor, result);
 
     }
 
     // printworkdir
     if (strcmp(command, "printworkdir") == 0) {
         #ifdef WIN32
-        int n = snprintf(NULL, 0, "%ls", std::filesystem::current_path().c_str());
-        result = (char*)Calloc(n + 1, sizeof(char));
-        sprintf_s(result, n + 1, "%ls", std::filesystem::current_path().c_str());
+        int n = snprintf(NULL, 0, "%ls\r\n", std::filesystem::current_path().c_str()+1);
+        result = (char*)Calloc(n, sizeof(char));
+        sprintf_s(result, n, "%ls\r\n", std::filesystem::current_path().c_str());
         #else
-        asprintf(&result, "%ls", std::filesystem::current_path().c_str());
+        asprintf(&result, "%s\r\n", std::filesystem::current_path().c_str());
         #endif
 
+        result = (char*)realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
+
+        #ifdef WIN32
+        strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
+        #else
+        strcat(result, " \r\n.\r\n");
+        #endif
+
+        Send(socket_descriptor, "300");
+        SendAll(socket_descriptor, result);
     }
 
     
     //char* result = _exec(cmd);
 
-    SendAll(socket_descriptor, result);
-
-
-
+    Free(result);
     return 0;
 }
 
@@ -900,20 +1039,28 @@ char* _exec(const char* cmd) {
     return result;
 }
 
-
+//////////////////////////////////////////////////////////////////////////////////
 
 
 void SendAll(SOCKET soc, const char* str) {
     if (str == NULL) {
         return;
     }
-
-    int size = strlen(str) + 1;
+    
+    unsigned long long size = strlen(str) + 1;
     int point = 0;
     char* buffer = (char*)Calloc(1024, sizeof(char));
+    
     while ((point*1024) < size) {
+        memset(buffer, '\0', 1024);
+        if ((point * 1024) - size > 0) {
+            memcpy(buffer, str + (point * 1024), size - (point * 1024) );
+        }
+        else {
+            memcpy(buffer, str + (point * 1024), 1024);
+        }
 
-        memcpy(buffer, str + (point * 1024), 1024);
+        
         Send(soc, buffer);
         point++;
 
@@ -1020,11 +1167,11 @@ void* Calloc(unsigned long int count, unsigned long int size) {
 
 // fprintf Wrapper
 void ShowErr(const char* str) {
-    char t[1024];
+    char t[1024] = {0};
     #ifdef _WIN32
-        strerror_s(t, 1024, errno);
+        strerror_s(t, 1023, errno);
     #else
-        strerror_r(errno, t, 1024);
+        strerror_r(errno, t, 1023);
     #endif
 
     printf("\n%s\n", t);

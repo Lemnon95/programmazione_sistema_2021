@@ -120,10 +120,13 @@ void openLog();
 void writeLog(unsigned long int Tpid, SOCKET soc, char* command);
 void closeLog();
 
-
 ////////////////////////////////////////////////////////////////////////////////////
-
 // thread function
+
+#ifdef __linux__
+void* SigHandler(void* dummy);
+#endif
+
 void* Accept(void* rank);
 int Autenticazione(SOCKET socket_descriptor);
 void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid);
@@ -153,6 +156,4 @@ void Free(void * arg, int size=0);
 // strcpy Wrapper
 void Strcpy(char* dest, unsigned int size, const char* src);
 
-#ifdef __linux__
-void* SigHandler (void* dummy);
-#endif
+
