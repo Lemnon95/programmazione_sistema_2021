@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <string>
 #include <time.h>
+#include <ctime>
 #include <filesystem>
 #include <iostream>
 
@@ -22,6 +23,8 @@
 #include <WS2tcpip.h>
 #include <iphlpapi.h>
 #pragma comment(lib, "Ws2_32.lib")
+
+#include <Lmcons.h>
 
 // alias per funzione di linux
 #define strtok_r strtok_s
@@ -42,6 +45,7 @@ inline CRITICAL_SECTION FileLock;
 #include <signal.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <pwd.h>
 
 //dichiarazione mutex e condition variables linux
 inline pthread_mutex_t mutex;

@@ -377,7 +377,7 @@ void SharedLibClient::EXEC() {
 
     if (strncmp(status, "300", 3) != 0) {
         Free(status, 1024);
-        printf("Errore nell'esecuzione di LSF\n");
+        printf("Errore nell'esecuzione di EXEC\n");
         return;
     }
     Free(status, 1024);

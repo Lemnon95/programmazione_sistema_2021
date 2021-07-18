@@ -904,6 +904,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         
         // remove
         if (i < 1) {
+            Free(list);
             Send(socket_descriptor, "400");
             return 1;
         }
@@ -956,13 +957,45 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
         Send(socket_descriptor, "300");
         SendAll(socket_descriptor, result);
+        Free(list);
+    }
+
+    // whoami
+    if (strcmp(command, "whoami") == 0) {
+#ifdef WIN32
+        unsigned long size = UNLEN + 1;
+        result = (char*)Calloc(size, sizeof(char));
+        if (!GetUserNameA(result, &size)) {
+            ShowErr("Impossibile ottenere l'username di whoami");
+        }
+#else
+        result = (char*)Calloc(257, sizeof(char));
+        passwd* user = getpwuid(getuid());
+        if(user == NULL) {
+            ShowErr("Impossibile ottenere l'username di whoami");
+        }
+        strcat(result, user->pw_name);
+#endif
+
+
+        result = (char*)realloc(result, strlen(result) + sizeof("\r\n \r\n.\r\n"));
+
+#ifdef WIN32
+        strcat_s(result, strlen(result) + sizeof("\r\n \r\n.\r\n"), "\r\n \r\n.\r\n");
+#else
+        strcat(result, " \r\n.\r\n");
+#endif
+
+        Send(socket_descriptor, "300");
+        SendAll(socket_descriptor, result);
+
 
     }
 
     // printworkdir
     if (strcmp(command, "printworkdir") == 0) {
         #ifdef WIN32
-        int n = snprintf(NULL, 0, "%ls\r\n", std::filesystem::current_path().c_str()+1);
+        int n = snprintf(NULL, 0, "%ls\r\n", std::filesystem::current_path().c_str())+1;
         result = (char*)Calloc(n, sizeof(char));
         sprintf_s(result, n, "%ls\r\n", std::filesystem::current_path().c_str());
         #else
@@ -981,10 +1014,46 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         SendAll(socket_descriptor, result);
     }
 
+    // sort
+    if (strcmp(command, "sort") == 0) {
+        char* _t = NULL, *buffer = NULL;
+
+        // sort
+        if ((_t = strtok_r(NULL, " ", &fin)) == NULL) {
+            Send(socket_descriptor, "400");
+            return 1;
+        }
+        
+        // sort <path>
+        if (!std::filesystem::exists(_t)) {
+            Send(socket_descriptor, "400");
+            return 1;
+        }
+
+        // sort <dir>
+        if (std::filesystem::is_directory(_t)) {
+            Send(socket_descriptor, "400");
+            return 1;
+        }
+
+#ifdef WIN32
+        int n = snprintf(NULL, 0, "sort %s", _t) + 1;
+        buffer = (char*)Calloc(n, sizeof(char));
+        sprintf_s(buffer, n, "sort %s", _t);
+#else
+        asprintf(&buffer, "sort %s", _t);
+#endif
+
+        result = _exec(buffer);
+        Send(socket_descriptor, "300");
+        SendAll(socket_descriptor, result);
+        Free(buffer, strlen(buffer)+1);
+
+    }
     
     //char* result = _exec(cmd);
 
-    Free(result);
+    //Free(result);
     return 0;
 }
 
@@ -1065,7 +1134,7 @@ void SendAll(SOCKET soc, const char* str) {
         point++;
 
     }
-    Free(buffer, 1024);
+
     Send(soc, "");
 
 }
@@ -1185,7 +1254,7 @@ void ShowErr(const char* str) {
 void Free(void* arg, int size) {
 
     if (arg == NULL) {
-        ShowErr("variabile data a Free() è NULL\n");
+        ShowErr("variabile data a Free() è NULL");
     }
 
     if (size != 0) {
