@@ -34,11 +34,11 @@ struct params {
 	char* exec;
 	struct download {
 		char* src;
-		char* dest;
+		unsigned long long size;
 	} download;
 	struct upload {
 		char* src;
-		char* dest;
+		unsigned long long size;
 	} upload;
 };
 
@@ -66,6 +66,8 @@ private:
 	void GestioneComandi();
 	void LSF();
 	void EXEC();
+	void DOWLOAD();
+	void UPLOAD();
 	char* ReadAll();
 };
 

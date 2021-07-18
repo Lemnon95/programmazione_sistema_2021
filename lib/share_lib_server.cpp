@@ -701,6 +701,24 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
           writeLog(Tpid, socket_descriptor, dup_cmd);
       }
   }
+  else if (strncmp(command, "DOWNLOAD", 8) == 0) {
+      command = strtok_r(NULL, "", &brkt);
+      if (DOWNLOAD(socket_descriptor, command) == 0) {
+          writeLog(Tpid, socket_descriptor, dup_cmd);
+      }
+  }
+  else if (strncmp(command, "SIZE", 4) == 0) {
+      command = strtok_r(NULL, "", &brkt);
+      if (SIZE_(socket_descriptor, command) == 0) {
+          writeLog(Tpid, socket_descriptor, dup_cmd);
+      }
+  }
+  else if (strncmp(command, "UPLOAD", 6) == 0) {
+      command = strtok_r(NULL, "", &brkt);
+      if (UPLOAD(socket_descriptor, command) == 0) {
+          writeLog(Tpid, socket_descriptor, dup_cmd);
+      }
+  }
   // altri comandi
 
 
@@ -717,13 +735,19 @@ int LSF(SOCKET socket_descriptor, char* path) {
     char* buffer = NULL;
     int n = 0;
 
+    std::error_code err;
+    
+
     for (auto& p : std::filesystem::directory_iterator(path, std::filesystem::directory_options::skip_permission_denied)) {
 
         if (p.is_directory()) continue;
 
+        
         std::filesystem::path file = p.path();
-        uintmax_t size = std::filesystem::file_size(file);
-
+        uintmax_t size = std::filesystem::file_size(file, err);
+        if (err.value() != 0) {
+            continue;
+        }
 
         #ifdef WIN32
 
@@ -1051,12 +1075,129 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
     }
     
-    //char* result = _exec(cmd);
 
     //Free(result);
     return 0;
 }
 
+int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
+    char* path = NULL, * size = NULL, *Pend = NULL;
+    
+    
+    if ((path = strtok_r(cmd, ";", &Pend)) == NULL) {
+        Send(socket_descriptor, "400");
+        return 1;
+    }
+    if ((size = strtok_r(NULL, ";", &Pend)) == NULL) {
+        Send(socket_descriptor, "400");
+        return 1;
+    }
+    if (std::filesystem::exists(path)) {
+        Send(socket_descriptor, "400");
+        return 1;
+    }
+
+    // TODO: ???
+
+    return 0;
+}
+
+int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
+
+    if (!std::filesystem::exists(path)) {
+        Send(socket_descriptor, "400");
+        return 1;
+    }
+    char* buffer = NULL;
+    std::error_code err;
+    std::error_condition ok;
+    unsigned long long size = std::filesystem::file_size(path, err);
+
+    if (err.value() != 0) {
+        Send(socket_descriptor, "400");
+        return 1;
+    }
+
+#ifdef WIN32
+    int n = snprintf(NULL, 0, "%llu\r\n", size) + 1; // taglia l'ultimo carattere
+    buffer = (char*)Calloc(n, sizeof(char));
+    sprintf_s(buffer, n, "%llu\r\n", size);
+#else
+    asprintf(&buffer, "%lu\r\n", size);
+#endif
+
+
+    Send(socket_descriptor, "300");
+    if (end) {
+        Send(socket_descriptor, buffer);
+    }
+    else {
+        buffer = (char*)realloc(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"));
+
+#ifdef WIN32
+        strcat_s(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
+#else
+        strncat(buffer, " \r\n.\r\n", sizeof(" \r\n.\r\n") + 1);
+#endif
+        SendAll(socket_descriptor, buffer);
+    }
+
+    return 0;
+}
+
+int UPLOAD(SOCKET socket_descriptor, char* cmd) {
+    char* path = NULL, * size = NULL, * Pend = NULL;
+    char* PendLU = NULL, *buffer = NULL;
+
+    if ((path = strtok_r(cmd, ";", &Pend)) == NULL) {
+        Send(socket_descriptor, "400");
+        return 1;
+    }
+    if ((size = strtok_r(NULL, ";", &Pend)) == NULL) {
+        Send(socket_descriptor, "400");
+        return 1;
+    }
+    unsigned long long sizeI = strtoul(size, &PendLU, 10);
+    if (!std::filesystem::exists(path)) {
+        Send(socket_descriptor, "400");
+        return 1;
+    }
+    if (sizeI > std::filesystem::file_size(path)) {
+        Send(socket_descriptor, "400");
+        return 1;
+    }
+    if (SIZE_(socket_descriptor, path, 1) != 0) {
+        return 1;
+    }
+    buffer = (char*)Calloc(sizeI+1, sizeof(char));
+    FILE* _f = NULL;
+#ifdef WIN32
+        fopen_s(&_f, path, "r");
+        if (errno) {
+            ShowErr("Impossibile aprire file per UPLOAD");
+        }
+#else
+    _f = fopen(path, "r");
+#endif
+
+#ifdef WIN32
+    fread_s(buffer, sizeI+1, 1, sizeI, _f);
+#else
+    fread(buffer, 1, sizeI, _f);
+#endif
+
+    buffer = (char*)realloc(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"));
+
+#ifdef WIN32
+    strcat_s(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
+#else
+    strncat(buffer, " \r\n.\r\n", sizeof(" \r\n.\r\n") + 1);
+#endif
+
+    SendAll(socket_descriptor, buffer);
+
+    return 0;
+}
 
 char* _exec(const char* cmd) {
 
@@ -1145,13 +1286,13 @@ void Send(SOCKET soc, const char* str) {
         return;
     }
 
-    if (send(soc, str, 1024, 0) < 0) {
+    if (send(soc, str, 1023, 0) < 0) {
         ShowErr("Errore nell'inviare un messaggio verso il server");
     }
 }
 
 void Recv(SOCKET soc, char* _return) {
-    if (recv(soc, _return, 1024, 0) < 0) {
+    if (recv(soc, _return, 1023, 0) < 0) {
         ShowErr("Errore nel ricevere un messaggio dal client");
     }
 

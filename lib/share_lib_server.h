@@ -136,6 +136,9 @@ int Autenticazione(SOCKET socket_descriptor);
 void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid);
 int LSF(SOCKET socket_descriptor, char* path);
 int EXEC(SOCKET socket_descriptor, char* cmd);
+int DOWNLOAD(SOCKET socket_descriptor, char* cmd);
+int SIZE_(SOCKET socket_descriptor, char* path, bool end=0);
+int UPLOAD(SOCKET socket_descriptor, char* cmd);
 char* _exec(const char* cmd);
 
 // send-recv Wrapper

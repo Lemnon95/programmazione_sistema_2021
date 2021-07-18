@@ -237,12 +237,12 @@ Comandi Client
 	: richiede che venga eseguito sul server il comando specificato da cmd [args..] e che venga ritornato il valore di ritorno di esecuzione del comando (corrisponde al comando EXEC)
 	
 
-	-d <src-path> <dest-path> 
-	: richiede che il server si prepari a ricevere il file identificato da <src-path> (client) e lo salvi su <dest-path> (server) (corrisponde al comando DOWNLOAD);
+	-d <src-path> <size> 
+	: richiede che il server si prepari a ricevere il file identificato su <src-path> (server) dei primi <size> byte (server) (corrisponde al comando DOWNLOAD);
 
 
-	-u <src-path> <dest-path>
-	: richiede che il server invii identificato da <src-path> (server) e che questo venga salvato su <dest-path> (client) (corrisponde al comando UPLOAD).
+	-u <src-path> <size>
+	: richiede che il server invii identificato da <src-path> (server) deu primi <size> byte (server) (corrisponde al comando UPLOAD).
 	
 
 ---------------------------------------------------------------------
