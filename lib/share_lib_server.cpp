@@ -402,10 +402,7 @@ void beginServer() {
         printf("\nConnessione in entrata\n");
 
         #ifdef _WIN32
-
         WakeConditionVariable(&Threadwait);
-
-
         #else // linux
         pthread_mutex_lock(&mutex);
         wake_one = false;
@@ -484,10 +481,11 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
 
     #ifdef WIN32
     localtime_s(&timeinfo, &rawtime);
-    #else //__linux___
-    localtime_r(&rawtime, &timeinfo);
-    #endif
     if (errno) ShowErr("Impossibile convertire il tempo locale");
+    #else //__linux___
+    if (localtime_r(&rawtime, &timeinfo) == NULL) ShowErr("Impossibile convertire il tempo locale");
+    #endif
+    
 
     strftime(time_stamp, sizeof(time_stamp), "%d-%m-%Y %H:%M:%S", &timeinfo);
 
@@ -849,13 +847,12 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         }
 
         std::error_code err;
-        std::error_condition ok;
         
         // copy path1 path2  ||  copy path1 path2 dir1
         for (int k = 0; k < i-1; k++) {
             if (std::filesystem::exists(list[k]) ){
                 std::filesystem::copy(list[k], list[i - 1], std::filesystem::copy_options::skip_existing, err);
-                if (err != ok) {
+                if (err.value() != 0) {
                     Free(list[k], strlen(list[k]));
                     continue;
                 }
@@ -863,7 +860,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                 #ifdef WIN32
                 n = snprintf(NULL, 0, "%s\r\n", list[k]) + 1; // taglia l'ultimo carattere
                 buffer = (char*)Calloc(n, sizeof(char));
-                snprintf(buffer, n, "%s\r\n", list[k]);
+                sprintf_s(buffer, n, "%s\r\n", list[k]);
                 #else
                 n = asprintf(&buffer, "%s\r\n", list[k]) + 1;
                 #endif
@@ -899,7 +896,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         Send(socket_descriptor, "300");
         SendAll(socket_descriptor, result);
 
-
+        Free(result);
         Free(list, i);
 
 
@@ -1108,9 +1105,9 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
         Send(socket_descriptor, "400");
         return 1;
     }
-    char* buffer = NULL;
+
+    char* buffer = (char*)Calloc(1024, sizeof(char));;
     std::error_code err;
-    std::error_condition ok;
     unsigned long long size = std::filesystem::file_size(path, err);
 
     if (err.value() != 0) {
@@ -1119,11 +1116,9 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
     }
 
 #ifdef WIN32
-    int n = snprintf(NULL, 0, "%llu\r\n", size) + 1; // taglia l'ultimo carattere
-    buffer = (char*)Calloc(n, sizeof(char));
-    sprintf_s(buffer, n, "%llu\r\n", size);
+    sprintf_s(buffer, 1023, "%llu\r\n", size);
 #else
-    asprintf(&buffer, "%lu\r\n", size);
+    snprintf(buffer, 1023, "%llu\r\n", size);
 #endif
 
 
@@ -1148,6 +1143,8 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
 int UPLOAD(SOCKET socket_descriptor, char* cmd) {
     char* path = NULL, * size = NULL, * Pend = NULL;
     char* PendLU = NULL, *buffer = NULL;
+    FILE* _f = NULL;
+    unsigned long long sizeI;
 
     if ((path = strtok_r(cmd, ";", &Pend)) == NULL) {
         Send(socket_descriptor, "400");
@@ -1157,7 +1154,9 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
         Send(socket_descriptor, "400");
         return 1;
     }
-    unsigned long long sizeI = strtoul(size, &PendLU, 10);
+
+    sizeI = strtoul(size, &PendLU, 10);
+    
     if (!std::filesystem::exists(path)) {
         Send(socket_descriptor, "400");
         return 1;
@@ -1169,22 +1168,25 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
     if (SIZE_(socket_descriptor, path, 1) != 0) {
         return 1;
     }
+    
     buffer = (char*)Calloc(sizeI+1, sizeof(char));
-    FILE* _f = NULL;
+    
 #ifdef WIN32
-        fopen_s(&_f, path, "r");
-        if (errno) {
-            ShowErr("Impossibile aprire file per UPLOAD");
-        }
+    fopen_s(&_f, path, "r");
+    if (errno) {
+        ShowErr("Impossibile aprire file per UPLOAD");
+    }
 #else
     _f = fopen(path, "r");
 #endif
 
 #ifdef WIN32
-    fread_s(buffer, sizeI+1, 1, sizeI, _f);
+    fread_s(buffer, sizeI, 1, sizeI, _f);
 #else
     fread(buffer, 1, sizeI, _f);
 #endif
+
+    fclose(_f);
 
     buffer = (char*)realloc(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"));
 
@@ -1195,7 +1197,7 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
 #endif
 
     SendAll(socket_descriptor, buffer);
-
+    Free(buffer);
     return 0;
 }
 
@@ -1261,6 +1263,20 @@ void SendAll(SOCKET soc, const char* str) {
     int point = 0;
     char* buffer = (char*)Calloc(1024, sizeof(char));
     
+    for (int i = 0; i < size; i += 1023) {
+        memset(buffer, '\0', 1024);
+
+        if (i + 1023 > size) {
+            memcpy(buffer, str + i, size - i);
+        }
+        else {
+            memcpy(buffer, str + i, 1023);
+        }
+
+        Send(soc, buffer);
+    }
+
+    /*
     while ((point*1024) < size) {
         memset(buffer, '\0', 1024);
         if ((point * 1024) - size > 0) {
@@ -1275,9 +1291,10 @@ void SendAll(SOCKET soc, const char* str) {
         point++;
 
     }
+    */
 
     Send(soc, "");
-
+    Free(buffer, 1024);
 }
 
 void Send(SOCKET soc, const char* str) {

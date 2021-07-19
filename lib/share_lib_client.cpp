@@ -4,7 +4,7 @@
 
 SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
-    this->parametri = { {AF_INET, 8888, {0}}, NULL, NULL, {NULL, NULL}, {NULL,NULL} };
+    this->parametri = { {AF_INET, 8888, {0}}, NULL, NULL, {NULL, 0}, {NULL, 0} };
 
     // parsing argomenti
     unsigned long long maxArg = argc;
@@ -402,7 +402,7 @@ void SharedLibClient::DOWLOAD() {
 #ifdef WIN32
     sprintf_s(command, 1023, "DOWNLOAD %s;%llu\r\n", this->parametri.download.src, this->parametri.download.size);
 #else
-    snprintf(&command, 1023, "DOWNLOAD %s;%llu\r\n", this->parametri.download.src, this->parametri.download.size);
+    snprintf(command, 1023, "DOWNLOAD %s;%llu\r\n", this->parametri.download.src, this->parametri.download.size);
 #endif
 
     this->Send_Recv(status, command);
@@ -431,7 +431,7 @@ void SharedLibClient::UPLOAD() {
 #ifdef WIN32
     sprintf_s(command, 1023, "UPLOAD %s;%llu\r\n", this->parametri.upload.src, this->parametri.upload.size);
 #else
-    snprintf(&command, 1023, "UPLOAD %s;%llu\r\n", this->parametri.upload.src, this->parametri.upload.size);
+    snprintf(command, 1023, "UPLOAD %s;%llu\r\n", this->parametri.upload.src, this->parametri.upload.size);
 #endif
 
     this->Send_Recv(status, command);
