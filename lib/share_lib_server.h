@@ -53,7 +53,7 @@ inline pthread_cond_t cond_var;
 inline pthread_t* threadChild = NULL;
 inline pthread_t thread_handler;
 inline bool wake_one = true;
-inline bool esci = false;
+inline sig_atomic_t esci = 0;
 inline int chiusura = 0;
 inline int signum;
 // alias di WinSock per la chiusura del socket

@@ -6,7 +6,14 @@
 
 
 int main(int argc, char* argv[]) {
-    
+  #ifdef __linux__
+  sigset_t sigset;
+  sigemptyset(&sigset);
+  sigaddset(&sigset, SIGINT);
+  sigaddset(&sigset, SIGHUP);
+  if((sigprocmask(SIG_BLOCK, &sigset, nullptr)== -1))
+    printf("Failure sigprocmask");
+  #endif
     // parser input
     SharedLibServer(argc, argv);
 
@@ -16,17 +23,9 @@ int main(int argc, char* argv[]) {
 
     // crea threads
     spawnSockets();
-    #ifdef __linux__
-    sigset_t sigset;
-    sigemptyset(&sigset);
-    sigaddset(&sigset, SIGINT);
-    sigaddset(&sigset, SIGHUP);
-    if((sigprocmask(SIG_BLOCK, &sigset, nullptr)== -1))
-    	printf("Failure sigprocmask");
-    #endif
+
     // rimani in ascolto
     beginServer();
 
     return 0;
 }
-

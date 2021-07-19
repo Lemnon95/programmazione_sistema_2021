@@ -395,6 +395,7 @@ void beginServer() {
         //Accept call creates a new socket for the incoming connection
         addr_size = sizeof(socketChild);
         newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
+        printf ("Sono dopo accept \n");
         if (newSocket == -1)
           break;
         Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
@@ -415,8 +416,8 @@ void beginServer() {
 
 #ifdef __linux__
     // terminazione programma (sigint) o restart (sighup)
-    esci = true;
     pthread_mutex_lock(&mutex);
+    esci = 1;
     pthread_cond_broadcast(&cond_var);
     pthread_mutex_unlock(&mutex);
     for (long i = 0; i < parametri.nthread; i++) {
@@ -429,16 +430,18 @@ void beginServer() {
 void clearSocket() {
     // se instanziato, chiudi il socket
     if (socketMaster != 0) {
+        printf ("sto chiudento socketmaster\n");
+        shutdown(socketMaster, SHUT_RD);
         closesocket(socketMaster);
     }
     // chiudi i socket in ascolto
-    for (int i = 0; i < parametri.nthread; i++) {
+    /*for (int i = 0; i < parametri.nthread; i++) {
 #ifdef _WIN32
         closesocket((SOCKET)threadChild[i]);
 #else //_linux_
         closesocket(threadChild[i]);
 #endif
-    }
+}*/
 
 
 #ifdef _WIN32
@@ -485,7 +488,7 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
     #else //__linux___
     if (localtime_r(&rawtime, &timeinfo) == NULL) ShowErr("Impossibile convertire il tempo locale");
     #endif
-    
+
 
     strftime(time_stamp, sizeof(time_stamp), "%d-%m-%Y %H:%M:%S", &timeinfo);
 
@@ -532,8 +535,10 @@ void* SigHandler (void* dummy){
   while (1) {
     printf("inside handler before\n");
     signum = sigwaitinfo(&sigset, NULL);
-    printf("inside handler after\n");
+    printf("inside handler after, signum: %d\n", signum);
     CloseServer();
+    if (signum == 2)
+      break;
   }
   return NULL;
 }
@@ -573,6 +578,7 @@ void* Accept(void* rank) {
         pthread_mutex_lock(&mutex);
         while (wake_one) {
           pthread_cond_wait(&cond_var, &mutex);
+          printf("Sono fuori la wait, prima di if esci\n");
           if (esci) {
             chiusura++;
             pid_t x = syscall(__NR_gettid);
@@ -734,13 +740,13 @@ int LSF(SOCKET socket_descriptor, char* path) {
     int n = 0;
 
     std::error_code err;
-    
+
 
     for (auto& p : std::filesystem::directory_iterator(path, std::filesystem::directory_options::skip_permission_denied)) {
 
         if (p.is_directory()) continue;
 
-        
+
         std::filesystem::path file = p.path();
         uintmax_t size = std::filesystem::file_size(file, err);
         if (err.value() != 0) {
@@ -758,7 +764,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
         #endif
 
         int q = strlen(records);
-        
+
         if ((records = (char*)realloc(records, (q + n))) == NULL) {
             ShowErr("Impossibile allocare memoria per i file della funzione LSF");
         }
@@ -812,13 +818,13 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
 
     char* result = NULL;
-    
+
     // copy
     if (strcmp(command, "copy") == 0) {
         int i = 0, n = 0;
         char* _t = NULL, *buffer = NULL;
         char** list = (char**)Calloc(1, sizeof(char*)); // lista di stringhe
-        
+
         result = (char*)Calloc(1, sizeof(char));
 
 
@@ -847,7 +853,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         }
 
         std::error_code err;
-        
+
         // copy path1 path2  ||  copy path1 path2 dir1
         for (int k = 0; k < i-1; k++) {
             if (std::filesystem::exists(list[k]) ){
@@ -865,7 +871,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                 n = asprintf(&buffer, "%s\r\n", list[k]) + 1;
                 #endif
 
-                
+
                 if ((result = (char*)realloc(result, (strlen(result) + n))) == NULL) {
                     ShowErr("Impossibile allocare memoria per i file della funzione LSF");
                 }
@@ -908,7 +914,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         char* _t = NULL, *buffer = NULL;
         char** list = (char**)Calloc(1, sizeof(char*)); // lista di stringhe
         result = (char*)Calloc(1, sizeof(char));
-        
+
 
         while ((_t = strtok_r(NULL, " ", &fin)) != NULL) {
 
@@ -922,7 +928,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                 ShowErr("Errore nell'allocare lista in EXEC comando remove");
             }
         }
-        
+
         // remove
         if (i < 1) {
             Free(list);
@@ -938,7 +944,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                     Send(socket_descriptor, "400");
                     return 1;
                 }
-                
+
 
                 #ifdef WIN32
                 n = snprintf(NULL, 0, "%s\r\n", list[k]) + 1; // taglia l'ultimo carattere
@@ -1044,7 +1050,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             Send(socket_descriptor, "400");
             return 1;
         }
-        
+
         // sort <path>
         if (!std::filesystem::exists(_t)) {
             Send(socket_descriptor, "400");
@@ -1071,7 +1077,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         Free(buffer, strlen(buffer)+1);
 
     }
-    
+
 
     //Free(result);
     return 0;
@@ -1079,8 +1085,8 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
 int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
     char* path = NULL, * size = NULL, *Pend = NULL;
-    
-    
+
+
     if ((path = strtok_r(cmd, ";", &Pend)) == NULL) {
         Send(socket_descriptor, "400");
         return 1;
@@ -1156,7 +1162,7 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
     }
 
     sizeI = strtoul(size, &PendLU, 10);
-    
+
     if (!std::filesystem::exists(path)) {
         Send(socket_descriptor, "400");
         return 1;
@@ -1168,9 +1174,9 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
     if (SIZE_(socket_descriptor, path, 1) != 0) {
         return 1;
     }
-    
+
     buffer = (char*)Calloc(sizeI+1, sizeof(char));
-    
+
 #ifdef WIN32
     fopen_s(&_f, path, "r");
     if (errno) {
@@ -1258,11 +1264,11 @@ void SendAll(SOCKET soc, const char* str) {
     if (str == NULL) {
         return;
     }
-    
+
     unsigned long long size = strlen(str) + 1;
     int point = 0;
     char* buffer = (char*)Calloc(1024, sizeof(char));
-    
+
     for (int i = 0; i < size; i += 1023) {
         memset(buffer, '\0', 1024);
 
@@ -1286,7 +1292,7 @@ void SendAll(SOCKET soc, const char* str) {
             memcpy(buffer, str + (point * 1024), 1024);
         }
 
-        
+
         Send(soc, buffer);
         point++;
 
