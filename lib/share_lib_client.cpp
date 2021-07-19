@@ -400,9 +400,9 @@ void SharedLibClient::DOWLOAD() {
     char* status = (char*)Calloc(1024, sizeof(char));
 
 #ifdef WIN32
-    sprintf_s(command, 1023, "DOWNLOAD %s;%llu\r\n", this->parametri.download.src, this->parametri.download.size);
+    sprintf_s(command, 1023, "DOWNLOAD %s;%llu", this->parametri.download.src, this->parametri.download.size);
 #else
-    snprintf(command, 1023, "DOWNLOAD %s;%llu\r\n", this->parametri.download.src, this->parametri.download.size);
+    snprintf(command, 1023, "DOWNLOAD %s;%llu", this->parametri.download.src, this->parametri.download.size);
 #endif
 
     this->Send_Recv(status, command);
@@ -429,9 +429,9 @@ void SharedLibClient::UPLOAD() {
     char* status = (char*)Calloc(1024, sizeof(char));
 
 #ifdef WIN32
-    sprintf_s(command, 1023, "UPLOAD %s;%llu\r\n", this->parametri.upload.src, this->parametri.upload.size);
+    sprintf_s(command, 1023, "UPLOAD %s;%llu", this->parametri.upload.src, this->parametri.upload.size);
 #else
-    snprintf(command, 1023, "UPLOAD %s;%llu\r\n", this->parametri.upload.src, this->parametri.upload.size);
+    snprintf(command, 1023, "UPLOAD %s;%llu", this->parametri.upload.src, this->parametri.upload.size);
 #endif
 
     this->Send_Recv(status, command);
