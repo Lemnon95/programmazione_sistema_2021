@@ -431,7 +431,11 @@ void clearSocket() {
     // se instanziato, chiudi il socket
     if (socketMaster != 0) {
         printf ("sto chiudento socketmaster\n");
+#ifdef WIN32
+        shutdown(socketMaster, SD_RECEIVE);
+#else
         shutdown(socketMaster, SHUT_RD);
+#endif
         closesocket(socketMaster);
     }
     // chiudi i socket in ascolto
@@ -563,7 +567,6 @@ void* Accept(void* rank) {
     #ifdef WIN32
     Tpid = GetCurrentThreadId();
     #else
-    // TODO: pthread thread id
     Tpid = syscall(__NR_gettid);
     #endif
 
@@ -572,7 +575,6 @@ void* Accept(void* rank) {
         // i thread vanno a dormire
         #ifdef _WIN32
         EnterCriticalSection(&CritSec);
-        //printf("thread id: %lu\n", GetCurrentThreadId());
         SleepConditionVariableCS(&Threadwait, &CritSec, INFINITE);
         #else //linux
         pthread_mutex_lock(&mutex);
@@ -602,6 +604,7 @@ void* Accept(void* rank) {
         if (Autenticazione(socket_descriptor)){
           continue;
         }
+
         GestioneComandi(socket_descriptor, Tpid);
 
     }
@@ -687,46 +690,47 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
   char* command = (char*)Calloc(1024, sizeof(char));
   char* dup_cmd = (char*)Calloc(1024, sizeof(char));
   char* brkt = NULL;
+  while (Recv(socket_descriptor, command) == 0) {
+      brkt = NULL;
+      Strcpy(dup_cmd, 1024, command);
 
-  Recv(socket_descriptor, command);
-
-  Strcpy(dup_cmd, 1024, command);
-
-  command = strtok_r(command, " ", &brkt);
-  if (strncmp(command, "LSF", 3) == 0) {
-    command = strtok_r(NULL, " ", &brkt);
-    if (LSF(socket_descriptor, command) == 0) {
-        writeLog(Tpid, socket_descriptor, dup_cmd);
-    }
-  }
-  else if (strncmp(command, "EXEC", 4) == 0) {
-      command = strtok_r(NULL, "", &brkt);
-      if (EXEC(socket_descriptor, command) == 0) {
-          writeLog(Tpid, socket_descriptor, dup_cmd);
+      command = strtok_r(command, " ", &brkt);
+      if (strncmp(command, "LSF", 3) == 0) {
+          command = strtok_r(NULL, " ", &brkt);
+          if (LSF(socket_descriptor, command) == 0) {
+              writeLog(Tpid, socket_descriptor, dup_cmd);
+          }
       }
-  }
-  else if (strncmp(command, "DOWNLOAD", 8) == 0) {
-      command = strtok_r(NULL, "", &brkt);
-      if (DOWNLOAD(socket_descriptor, command) == 0) {
-          writeLog(Tpid, socket_descriptor, dup_cmd);
+      if (strncmp(command, "EXEC", 4) == 0) {
+          command = strtok_r(NULL, "", &brkt);
+          if (EXEC(socket_descriptor, command) == 0) {
+              writeLog(Tpid, socket_descriptor, dup_cmd);
+          }
       }
-  }
-  else if (strncmp(command, "SIZE", 4) == 0) {
-      command = strtok_r(NULL, "", &brkt);
-      if (SIZE_(socket_descriptor, command) == 0) {
-          writeLog(Tpid, socket_descriptor, dup_cmd);
+      if (strncmp(command, "DOWNLOAD", 8) == 0) {
+          command = strtok_r(NULL, "", &brkt);
+          if (DOWNLOAD(socket_descriptor, command) == 0) {
+              writeLog(Tpid, socket_descriptor, dup_cmd);
+          }
       }
-  }
-  else if (strncmp(command, "UPLOAD", 6) == 0) {
-      command = strtok_r(NULL, "", &brkt);
-      if (UPLOAD(socket_descriptor, command) == 0) {
-          writeLog(Tpid, socket_descriptor, dup_cmd);
+      if (strncmp(command, "SIZE", 4) == 0) {
+          command = strtok_r(NULL, "", &brkt);
+          if (SIZE_(socket_descriptor, command) == 0) {
+              writeLog(Tpid, socket_descriptor, dup_cmd);
+          }
       }
-  }
-  // altri comandi
+      if (strncmp(command, "UPLOAD", 6) == 0) {
+          command = strtok_r(NULL, "", &brkt);
+          if (UPLOAD(socket_descriptor, command) == 0) {
+              writeLog(Tpid, socket_descriptor, dup_cmd);
+          }
+      }
+      // altri comandi
 
-
-  Free(dup_cmd, strlen(dup_cmd));
+      memset(command, '\0', 1024);
+      memset(dup_cmd, '\0', 1024);
+  }
+  
 }
 
 int LSF(SOCKET socket_descriptor, char* path) {
@@ -1314,11 +1318,12 @@ void Send(SOCKET soc, const char* str) {
     }
 }
 
-void Recv(SOCKET soc, char* _return) {
-    if (recv(soc, _return, 1023, 0) < 0) {
-        ShowErr("Errore nel ricevere un messaggio dal client");
+int Recv(SOCKET soc, char* _return) {
+    if (recv(soc, _return, 1023, 0) <= 0) {
+        //ShowErr("Errore nel ricevere un messaggio dal client");
+        return 1;
     }
-
+    return 0;
 }
 
 void Send_Recv(SOCKET soc, char* _return, const char* str, const char* status) {

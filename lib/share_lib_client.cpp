@@ -213,7 +213,7 @@ void SharedLibClient::Connect() {
     */
     this->GestioneComandi();
 
-    closesocket(this->socketClient);
+    //closesocket(this->socketClient);
 }
 
 void SharedLibClient::getPassphrase(const char* printText, char* passphrase) {
@@ -479,6 +479,11 @@ char* SharedLibClient::ReadAll(){
 void SharedLibClient::clearSocket() {
     // se instanziato, chiudi il socket
     if (this->socketClient != 0) {
+#ifdef WIN32
+        shutdown(this->socketClient, SD_BOTH);
+#else
+        shutdown(this->socketClient, SHUT_RDWR);
+#endif
         closesocket(this->socketClient);
     }
 
@@ -493,7 +498,7 @@ void SharedLibClient::clearSocket() {
 void* Calloc(unsigned long int count, unsigned long int size) {
 
     if (count == 0 || size == 0) {
-        fprintf(stderr, "Uno dei due numeri del Calloc � impostato a 0");
+        fprintf(stderr, "Uno dei due numeri del Calloc e' impostato a 0");
         exit(1);
         return NULL;
     }

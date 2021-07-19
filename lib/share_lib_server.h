@@ -144,7 +144,7 @@ char* _exec(const char* cmd);
 // send-recv Wrapper
 void SendAll(SOCKET soc, const char* str);
 void Send(SOCKET soc, const char* str);
-void Recv(SOCKET soc, char* _return);
+int Recv(SOCKET soc, char* _return);
 void Send_Recv(SOCKET soc, char* _return, const char* str = NULL, const char* status = NULL);
 
 ////////////////////////////////////////////////////////////////////////////////////
