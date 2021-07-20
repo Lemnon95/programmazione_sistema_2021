@@ -7,6 +7,7 @@
 #define MAX_PATH 260
 #define SERVERLISTEN "0.0.0.0"
 
+#include <iostream>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -14,7 +15,7 @@
 #include <time.h>
 #include <ctime>
 #include <filesystem>
-#include <iostream>
+#include <stdarg.h>
 
 #ifdef _WIN32
 #define _WINSOCKAPI_
@@ -143,9 +144,10 @@ char* _exec(const char* cmd);
 
 // send-recv Wrapper
 void SendAll(SOCKET soc, const char* str);
-void Send(SOCKET soc, const char* str);
-int Recv(SOCKET soc, char* _return);
-void Send_Recv(SOCKET soc, char* _return, const char* str = NULL, const char* status = NULL);
+void Send(SOCKET soc, const char* str, unsigned long long bufferMaxLen);
+int Recv(SOCKET soc, char* _return, unsigned long long bufferMaxLen);
+int RecvAll(SOCKET soc, char* _return);
+//void Send_Recv(SOCKET soc, char* _return, const char* str = NULL, const char* status = NULL);
 
 ////////////////////////////////////////////////////////////////////////////////////
 
@@ -162,5 +164,5 @@ void ShowErr(const char* str);
 void Free(void * arg, int size=0);
 // strcpy Wrapper
 void Strcpy(char* dest, unsigned int size, const char* src);
-
-
+// asprintf Wrapper
+int Asprintf(char*& buffer, const char* Format, ...);

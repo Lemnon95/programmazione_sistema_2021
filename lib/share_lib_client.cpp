@@ -3,7 +3,7 @@
 
 
 SharedLibClient::SharedLibClient(int argc, char* argv[]) {
-
+    
     this->parametri = { {AF_INET, 8888, {0}}, NULL, NULL, {NULL, 0}, {NULL, 0} };
 
     // parsing argomenti
@@ -152,7 +152,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
         ShowErr("indirizzo ip mancante (-h)");
     }
 
-
+#ifdef _DEBUG
     printf("\nserver: %d %d\nlsf: %s\nexec: %s\ndownload: %s %llu\nupload: %s %llu\n",
         this->parametri.server.sin_addr.s_addr,
         this->parametri.server.sin_port,
@@ -163,7 +163,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
         this->parametri.upload.src,
         this->parametri.upload.size
     );
-
+#endif // DEBUG
 
 
     this->T_s = this->generateToken("Immetti passphrase del server (max 254): ");
@@ -194,13 +194,14 @@ void SharedLibClient::Connect() {
     }
 #endif
 
+    // apri un socket TCP
     this->socketClient = socket(PF_INET, SOCK_STREAM, 0);
     if (this->socketClient < 0) {
         this->clearSocket();
         ShowErr("Errore creazione socket master");
     }
 
-
+    // tentativo di connessione al server dato
     if (connect(this->socketClient, (sockaddr*)&(this->parametri.server), sizeof(this->parametri.server)) < 0) {
         this->clearSocket();
         ShowErr("Impossibile connettersi al server");
@@ -208,25 +209,29 @@ void SharedLibClient::Connect() {
 
     // effettua la connessione ed autenticazione
     this->Trasmissione();
-    /*
-    TODO: inviare e gestire comandi passati come args
-    */
-    this->GestioneComandi();
+    
+#ifdef _DEBUG
+    printf("\nConnessione OK\n");
+#endif
 
-    //closesocket(this->socketClient);
+    // invio e ricezione di più comandi
+    this->GestioneComandi();
 }
 
 void SharedLibClient::getPassphrase(const char* printText, char* passphrase) {
+    // prende in input x caratteri
     printf("%s",printText);
     fgets(passphrase, 254, stdin);
 }
 
 unsigned long int SharedLibClient::generateToken(const char* printText) {
-
+    // stringa di caratteri
     char* passphrase = (char*)Calloc(256, sizeof(char));
 
+    // ottieni l'input dell'utente, la stringa contiene 2 \0\0 finali
     this->getPassphrase(printText,passphrase);
 
+    // ottieni l'hash dalla stringa data
     unsigned long int k = this->hashToken(passphrase);
 
     // reset passphrase
@@ -250,35 +255,7 @@ unsigned long int SharedLibClient::hashToken(char* token) {
     return k;
 }
 
-void SharedLibClient::Send(const char* str) {
 
-    if (str == NULL) {
-        return;
-    }
-
-    if (send(this->socketClient, str, 1023, 0) < 0) {
-        ShowErr("Errore nell'inviare un messaggio verso il server");
-    }
-}
-
-void SharedLibClient::Recv(char* _return) {
-    memset(_return, '\0', 1024);
-    if (recv(this->socketClient, _return, 1023, 0) < 0) {
-        ShowErr("Errore nel ricevere un messaggio dal server");
-    }
-
-}
-
-void SharedLibClient::Send_Recv(char* _return, const char* str, char* status) {
-
-    this->Send(str);
-
-    if (status != NULL) {
-        this->Recv(status);
-    }
-
-    this->Recv(_return);
-}
 
 void SharedLibClient::Trasmissione() {
 
@@ -286,12 +263,14 @@ void SharedLibClient::Trasmissione() {
     unsigned long int enc1 = 0;
     unsigned long int enc2 = 0;
     unsigned long int nonce = 0;
+    
+    int _authMsgLen = 0;
+    char* authmsg = NULL;
 
     char* endP;
-    char status[1024] = { 0 };
-    char _t[1024] = { 0 };
-    char authmsg[1024] = { 0 };
-
+    char status[4] = { 0 };
+    char* recv_Challenge = (char*)Calloc(11, sizeof(char)); // array della challenge
+    int _recvChallengeLen = 0;
     /*
     1. invio HELO
     2. ricevo la challenge
@@ -302,36 +281,45 @@ void SharedLibClient::Trasmissione() {
     comandi ulteriori
     */
 
-    // passo 1,2
-    this->Send_Recv(_t, "HELO", status);
-    challenge = strtoul(_t, &endP, 10);
+    // passo 1,2 //////////////////////////////////////////////////
+    this->Send("HELO", 5); // invio HELO
+    this->Recv(status, 4); // ricevo lo status
 
-
+    // controllo lo status ottenuto se è ok
     if (strncmp(status, "300", 3) != 0) {
         closesocket(this->socketClient);
         ShowErr("status code invalido");
     }
-    memset(status, '\0', 1024);
+    memset(status, '\0', 4); // pulisco lo status
 
-    // passo 3
+
+    if ((_recvChallengeLen = this->Recv(recv_Challenge, 11)) <= 0) {
+        ShowErr("Errore nel ricevere la challenge dal server");
+    } // ricevo la challenge
+    challenge = strtoul(recv_Challenge, &endP, 10); // strasformo la challenge
+    Free(recv_Challenge, _recvChallengeLen);
+    ///////////////////////////////////////////////////////////////
+
+    // passo 3 ////////////////////////////////////////////////////
     nonce = challenge ^ this->T_s; // risolvo la challenge
+    ///////////////////////////////////////////////////////////////
 
-    // passo 4,5
+    // passo 4,5 //////////////////////////////////////////////////
     enc1 = this->T_s ^ nonce ^ this->T_c;
     enc2 = this->T_c ^ nonce;
 
-    snprintf(authmsg, 1024, "AUTH %lu;%lu", enc1, enc2); // compongo AUTH enc1;enc2
+    _authMsgLen = Asprintf(authmsg, "AUTH %lu;%lu", enc1, enc2); // compongo AUTH enc1;enc2
+    ///////////////////////////////////////////////////////////////
 
-    // passo 6
-    this->Send_Recv(status, authmsg);
+    // passo 6 ////////////////////////////////////////////////////
+    this->Send(authmsg, _authMsgLen);
+    this->Recv(status, 4);
 
-    if (strncmp(status, "200", 3) != 0) ShowErr("Auth errato");
+    Free(authmsg, _authMsgLen);
+    if (strncmp(status, "200", 3) != 0) ShowErr("Auth errato"); // Error
+    ///////////////////////////////////////////////////////////////
 
-#ifdef _DEBUG
-    printf("\nConnessione OK\n");
-#endif
-
-
+    // Auth ok
 }
 
 void SharedLibClient::GestioneComandi () {
@@ -351,135 +339,222 @@ void SharedLibClient::GestioneComandi () {
 
 void SharedLibClient::LSF(){
 
-    char* status = (char*)Calloc(1024, sizeof(char));
-    char* command = (char*)Calloc(1024, sizeof(char));
+    char status[4] = { 0 };
+    
+    char* command = NULL;
+    int _commandLen = 0;
 
-    snprintf(command, 1024, "LSF %s", this->parametri.lsf);
+    char* ans = NULL;
+    int _ansLen = 0;
 
-    this->Send_Recv(status, command);
+
+    _commandLen = Asprintf(command, "LSF %s", this->parametri.lsf);
+
+    this->Send(command, _commandLen);
+    this->Recv(status, 4);
  
-    Free(command, 1024);
+    Free(command, _commandLen);
 
+    // status del comando
     if (strncmp(status, "300", 3) != 0){
-        Free(status, 1024);
-        
         printf("Errore nell'esecuzione di LSF\n");
         return;
     }
-    Free(status, 1024);
 
-    char* ans = this->ReadAll();
+    _ansLen = this->ReadAll(ans);
 
-    printf("%s\n", ans);
-    Free(ans, strlen(ans));
+    printf("\n%s\n", ans);
+    Free(ans, _ansLen);
 }
 
 void SharedLibClient::EXEC() {
-    char* command = (char*)Calloc(1024, sizeof(char));
-    char* status = (char*)Calloc(1024, sizeof(char));
+    
+    char status[4] = { 0 };
 
-    snprintf(command, 1024, "EXEC %s", this->parametri.exec);
-    this->Send_Recv(status, command);
+    char* command = NULL;
+    int _commandLen = 0;
 
-    Free(command, 1024);
+    char* ans = NULL;
+    int _ansLen = 0;
 
+    _commandLen = Asprintf(command, "EXEC %s", this->parametri.exec);
+
+    this->Send(command, _commandLen);
+    this->Recv(status, 4);
+
+    Free(command, _commandLen);
     if (strncmp(status, "300", 3) != 0) {
-        Free(status, 1024);
         printf("Errore nell'esecuzione di EXEC\n");
         return;
     }
-    Free(status, 1024);
 
-    char* ans = this->ReadAll();
+    _ansLen = this->ReadAll(ans);
 
     printf("\n%s\n", ans);
+    Free(ans, _ansLen);
 }
 
 void SharedLibClient::DOWLOAD() {
-    char* command = (char*)Calloc(1024, sizeof(char));
-    char* status = (char*)Calloc(1024, sizeof(char));
+    
+    char status[4] = { 0 };
+    
+    char* command = NULL;
+    int _commandLen = 0;
 
-#ifdef WIN32
-    sprintf_s(command, 1023, "DOWNLOAD %s;%llu", this->parametri.download.src, this->parametri.download.size);
-#else
-    snprintf(command, 1023, "DOWNLOAD %s;%llu", this->parametri.download.src, this->parametri.download.size);
-#endif
+    _commandLen = Asprintf(command, "DOWNLOAD %s;%llu", this->parametri.download.src, this->parametri.download.size);
 
-    this->Send_Recv(status, command);
+    this->Send(command, _commandLen);
+    this->Recv(status, 4);
 
-    Free(command, strlen(command));
-
+    Free(command, _commandLen);
     if (strncmp(status, "300", 3) != 0) {
-        Free(status, 1024);
-
         printf("Errore nell'esecuzione di DOWLOAD\n");
         return;
     }
-    Free(status, 1024);
 
-    //char* ans = this->ReadAll();
-
-    //printf("%s\n", ans);
-    //Free(ans, strlen(ans));
+    // TODO: invio X byte to server
 
 }
 
 void SharedLibClient::UPLOAD() {
-    char* command = (char*)Calloc(1024, sizeof(char));
-    char* status = (char*)Calloc(1024, sizeof(char));
+    
+    char status[4] = {0};
 
-#ifdef WIN32
-    sprintf_s(command, 1023, "UPLOAD %s;%llu", this->parametri.upload.src, this->parametri.upload.size);
-#else
-    snprintf(command, 1023, "UPLOAD %s;%llu", this->parametri.upload.src, this->parametri.upload.size);
-#endif
+    char* command = NULL;
+    int _commandLen = 0;
 
-    this->Send_Recv(status, command);
+    char* ans = NULL;
+    int _ansLen = 0;
 
-    Free(command, strlen(command));
+    _commandLen = Asprintf(command, "UPLOAD %s;%llu", this->parametri.upload.src, this->parametri.upload.size);
+
+    this->Send(command, _commandLen);
+    this->Recv(status, 4);
+
+    Free(command, _commandLen);
 
     if (strncmp(status, "300", 3) != 0) {
-        Free(status, 1024);
-
         printf("Errore nell'esecuzione di UPLOAD\n");
         return;
     }
-    Free(status, 1024);
 
+    _ansLen = this->ReadAll(ans);
 
-
-    char* ans = this->ReadAll();
-
-    printf("%s\n", ans);
-    Free(ans, strlen(ans));
+    printf("\n%s\n", ans);
+    Free(ans, _ansLen);
 }
 
-char* SharedLibClient::ReadAll(){
-    char* buffer_recv = (char*)Calloc(1024, sizeof(char));
-    char* ans = (char*)Calloc(1, sizeof(char));
-    int x = 0;
+///////////////
 
-    while (true) {
-        this->Recv(buffer_recv);
+void SharedLibClient::Send(const char* str, unsigned long long bufferMaxLen) {
 
-        if (strlen(buffer_recv) == 0) break;
-    
-    
-        if ((ans = (char*)realloc(ans, strlen(ans) + strlen(buffer_recv) +1 )) == NULL) {
+    if (str == NULL) {
+        return;
+    }
+    if (bufferMaxLen == 0) {
+        return;
+    }
+
+    if (send(this->socketClient, str, bufferMaxLen, 0) <= 0) {
+        ShowErr("Errore nell'inviare un messaggio verso il server");
+    }
+}
+
+int SharedLibClient::Recv(char* _return, unsigned long long bufferMaxLen) {
+    if (bufferMaxLen == 0) {
+        return -1;
+    }
+    if (_return == NULL) {
+        return -1;
+    }
+    int len = 0;
+    int max = bufferMaxLen;
+    char* moreBuf = NULL;
+
+    if ((len = recv(this->socketClient, _return, bufferMaxLen, 0)) <= 0) {
+        //ShowErr("Errore nel ricevere un messaggio dal client");
+        return -1;
+    }
+
+    if (_return[max - 1] != '\0') {
+
+        moreBuf = (char*)Calloc(bufferMaxLen, sizeof(char));
+
+        while (_return[max - 1] != '\0') {
+
+            if ((len = recv(this->socketClient, moreBuf, bufferMaxLen, 0)) <= 0) {
+                //ShowErr("Errore nel ricevere un messaggio dal client");
+                return -1;
+            }
+
+            _return = (char*)realloc(_return, max + len);
+            memcpy(_return + max, moreBuf, len);
+            max += len;
+        }
+        Free(moreBuf, bufferMaxLen);
+    }
+
+
+    return max;
+
+}
+
+int SharedLibClient::Send_Recv(char* _return, const char* str, unsigned long long send_size, char* status, unsigned long long status_size) {
+
+    this->Send(str, send_size);
+
+    if (status != NULL) {
+        this->Recv(status, status_size);
+    }
+
+    return this->ReadAll(_return);
+}
+
+int SharedLibClient::ReadAll(char* ans){
+
+    if (ans != NULL) {
+        ShowErr("Passare a ReadAll un puntatore nullo");
+    }
+
+    char* buffer_recv = (char*)Calloc(128, sizeof(char));
+    ans = (char*)Calloc(1, sizeof(char));
+    int len_ans = 0,len = 0;
+
+    /*
+    buffer lungo effettivamente 128, ma leggo solo 127 byte, l'ultimo sarà \0
+    */
+    while ((len = recv(this->socketClient, buffer_recv, 127, 0)) > 0) { // buffer_recv avrà \0 alla fine
+        
+        if ((ans = (char*)realloc(ans, len_ans + len)) == NULL) {
             ShowErr("Impossibile allocare memoria per il ReadAll");
         }
 
-        memcpy(ans + strlen(ans), buffer_recv, strlen(buffer_recv)+1);
-        x++;
-  }
+#ifdef _WIN32
+        strcat_s(ans, len_ans + len, buffer_recv); 
+#else
+        strcat(ans, buffer_recv);
+#endif
 
-  return ans;
+        //memcpy(ans + len_ans, buffer_recv, strlen(buffer_recv)+1);
+        
+        if (_endingSequence(buffer_recv, 128)) {
+            break;
+        }
+
+        // clean up
+        memset(buffer_recv, '\0', len);
+        len_ans += len;
+    }
+
+    Free(buffer_recv);
+
+    return len_ans;
 }
 
 void SharedLibClient::clearSocket() {
     // se instanziato, chiudi il socket
     if (this->socketClient != 0) {
-#ifdef WIN32
+#ifdef _WIN32
         shutdown(this->socketClient, SD_BOTH);
 #else
         shutdown(this->socketClient, SHUT_RDWR);
@@ -491,6 +566,23 @@ void SharedLibClient::clearSocket() {
 #ifdef _WIN32
     WSACleanup();
 #endif
+}
+
+bool SharedLibClient::_endingSequence(const char* buffer, unsigned long long size) {
+    char sequence[7] = " \r\n.\r\n"; // conto anche \0
+    if (size < 7) {
+        return false;
+    }
+
+    for (int i = 0; i < size - 7; i++) {
+
+        if (strncmp(buffer + i, sequence, 7) == 0) {
+            return true;
+        }
+
+    }
+
+    return false;
 }
 
 
@@ -538,9 +630,11 @@ void Free(void* arg, int size) {
         return;
     }
 
-    memset(arg, '\0', size);
+    if (size != 0) {
+        memset(arg, '\0', size);
+    }
+    
     free(arg);
-
 }
 
 // strcpy Wrapper
@@ -555,4 +649,26 @@ void Strcpy(char* dest, unsigned int size, const char* src) {
     strncpy(dest, src, size);
 #endif
 
+}
+
+// asprintf Wrapper
+int Asprintf(char*& buffer, const char* Format, ...) {
+    
+    if (buffer != NULL) {
+        ShowErr("Asprintf buffer deve essere un puntatore a NULL");
+    }
+    int n = 0;
+
+    va_list argptr;
+    va_start(argptr, Format);
+
+#ifdef _WIN32
+    n = vsnprintf(NULL, 0, Format, argptr) + 1;
+    buffer = (char*)Calloc(n, sizeof(char));
+    vsprintf_s(buffer, n, Format, argptr);
+#else
+    n = vasprintf(&authmsg, Format, argptr) + 1;
+#endif
+
+    return n;
 }

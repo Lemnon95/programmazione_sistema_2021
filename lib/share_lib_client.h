@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string>
+#include <stdarg.h>
 
 #ifdef _WIN32
 #define _WINSOCKAPI_ 
@@ -58,17 +59,28 @@ private:
 	void getPassphrase(const char* printText, char* passphrase);
 	unsigned long int generateToken(const char* printText);
 	unsigned long int hashToken(char* token);
-	void Send(const char* str);
-	void Recv(char* _return);
-	void Send_Recv(char* _return, const char* str = NULL, char* status = NULL);
+	
 	void Trasmissione();
 	void clearSocket();
+
 	void GestioneComandi();
 	void LSF();
 	void EXEC();
 	void DOWLOAD();
 	void UPLOAD();
-	char* ReadAll();
+
+	void Send(const char* str, unsigned long long bufferMaxLen);
+	int Recv(char* _return, unsigned long long bufferMaxLen);
+	// TODO: DEPRECATE
+	int  Send_Recv(char* _return,
+		const char* str, 
+		unsigned long long send_size, 
+		char* status = NULL,
+		unsigned long long status_size = 0
+	);
+	int  ReadAll(char* ans);
+
+	bool _endingSequence(const char* buffer, unsigned long long size);
 };
 
 // calloc Wrapper
@@ -76,6 +88,8 @@ void* Calloc(unsigned long int nmemb, unsigned long int size);
 // fprintf Wrapper
 void ShowErr(const char* str);
 // free Wrapper
-void Free(void* arg, int size);
+void Free(void* arg, int size=0);
 // strcpy Wrapper
 void Strcpy(char* dest, unsigned int size, const char* src);
+// asprintf Wrapper
+int Asprintf(char*& buffer, const char* Format, ...);

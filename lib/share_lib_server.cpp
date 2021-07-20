@@ -8,24 +8,16 @@ void SharedLibServer(int argc, char* argv[]) {
 
     // trova il percorso temp
     #ifdef _WIN32
-    WCHAR* _Tpath = (WCHAR*)Calloc(MAX_PATH+1, sizeof(WCHAR));
     // instanzio una stringa di MAX_PATH caratteri, MAX_PATH è definito da Windows
 
-    GetTempPathW(MAX_PATH, _Tpath);
-    // chiedo al sistema il percorso temporaneo, _Tpath conterrà una cella vuota alla fine
+    GetTempPathA(MAX_PATH, _path);
+    // chiedo al sistema il percorso temporaneo, _path conterrà una cella vuota alla fine
 
     // concateno il testo "server.log" al path base della cartella temporanea
-    wcscat_s(_Tpath, MAX_PATH, L"server.log");
+    strcat_s(_path, MAX_PATH, "server.log");
     if (errno) {
         ShowErr("errore appendere nome file a percorso log");
     }
-    // converto il percorso da WCHAR a char
-    wcstombs_s(NULL, _path, MAX_PATH+1, _Tpath, MAX_PATH+1);
-    if (errno) {
-        ShowErr("errore convertire WCHAR in char*");
-    }
-    // pulisco la variabile _Tpath
-    Free(_Tpath, MAX_PATH + 1);
     #else
     Strcpy(_path, MAX_PATH+1, "/tmp/server.log");
     #endif // _WIN32
@@ -128,6 +120,7 @@ void SharedLibServer(int argc, char* argv[]) {
 
     }
 
+#ifdef _DEBUG
     // debug print
     printf("---\nPorta: %d\nNumero thread: %d\nConfig path: %s \nLog path: %s \nStampa token: %d\n---\n",
         parametri.port,
@@ -135,12 +128,13 @@ void SharedLibServer(int argc, char* argv[]) {
         parametri.configPath,
         parametri.logPath,
         parametri.printToken);
-
+#endif
 
     // se definito leggi il config
     // sovrascrivi le impostazioni che sono defaut
     parseConfig();
 
+#ifdef _DEBUG
     // debug print
     printf("---\nPorta: %d\nNumero thread: %d\nConfig path: %s \nLog path: %s \nStampa token: %d\n---\n",
         parametri.port,
@@ -148,12 +142,13 @@ void SharedLibServer(int argc, char* argv[]) {
         parametri.configPath,
         parametri.logPath,
         parametri.printToken);
+#endif
 
 }
 
 void CloseServer() {
 
-    #ifdef WIN32
+    #ifdef _WIN32
     DeleteCriticalSection(&FileLock);
     #else
         // TODO: distruzione pthread lock
@@ -191,11 +186,11 @@ void parseConfig() {
             int i;
             int printTok,nthread,port = 0;
 
-
+            
             // il primo strtok prende il numero del config
             i = std::stoi(strtok_r(line, " ", &next_tok));
             // il secondo strtok ottiene il valore associato
-            configData = strtok_r(next_tok, " ", &next_tok);
+            configData = strtok_r(NULL, " ", &next_tok);
 
             if (configData == NULL) {
                 continue;
@@ -319,12 +314,6 @@ void spawnSockets() {
         ShowErr("Errore creazione socket master");
     }
 
-    /*int _e = false;
-    if (setsockopt(socketMaster, SOL_SOCKET, SO_REUSEADDR, (char*)&_e, sizeof(_e)) < 0) {
-        ShowErr("impossibile impostare il socket server");
-    }
-    */
-
     // crea figli
     #ifdef _WIN32
     threadChild = (void**)Calloc(parametri.nthread, sizeof(HANDLE));
@@ -347,8 +336,9 @@ void spawnSockets() {
             printf("Failed to create thread\n");
         #endif
     }
+    
     #ifdef __linux__
-    // spawno anche il thread che gestisce i segnali:
+    // spawno 1 thread che gestisce i segnali:
     if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
         printf("Failed to create signal handling thread\n");
     #endif
@@ -385,22 +375,24 @@ void beginServer() {
 
     openLog();
 
-    #ifdef WIN32
+    #ifdef _WIN32
     InitializeCriticalSection(&FileLock);
     #else
     // TODO: inizializzazione pthread lock
     #endif
 
+    // Main Thread Loop
     while (1) {
-        //Accept call creates a new socket for the incoming connection
+        // accept() crea un nuovo file-descriptor per ogni client in entrata
         addr_size = sizeof(socketChild);
         newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
         printf ("Sono dopo accept \n");
-        if (newSocket == -1)
-          break;
+        if (newSocket == -1) break;
         Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
 
+#ifdef _DEBUG
         printf("\nConnessione in entrata\n");
+#endif // _DEBUG
 
         #ifdef _WIN32
         WakeConditionVariable(&Threadwait);
@@ -409,7 +401,6 @@ void beginServer() {
         wake_one = false;
         pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
         pthread_mutex_unlock(&mutex);
-
         #endif // _WIN32
 
     }
@@ -431,23 +422,14 @@ void clearSocket() {
     // se instanziato, chiudi il socket
     if (socketMaster != 0) {
         printf ("sto chiudento socketmaster\n");
-#ifdef WIN32
+#ifdef _WIN32
         shutdown(socketMaster, SD_RECEIVE);
 #else
         shutdown(socketMaster, SHUT_RD);
 #endif
         closesocket(socketMaster);
     }
-    // chiudi i socket in ascolto
-    /*for (int i = 0; i < parametri.nthread; i++) {
-#ifdef _WIN32
-        closesocket((SOCKET)threadChild[i]);
-#else //_linux_
-        closesocket(threadChild[i]);
-#endif
-}*/
-
-
+    
 #ifdef _WIN32
     WSACleanup();
 #endif
@@ -474,7 +456,7 @@ void openLog() {
 
 void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
     if (FileDescLog == NULL) ShowErr("Impossibile scrivere su log, file non aperto");
-#ifdef WIN32
+#ifdef _WIN32
     EnterCriticalSection(&FileLock);
 #else
     // TODO: pthread enter critcial
@@ -486,20 +468,19 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
     char time_stamp[80];
     if (time(&rawtime) < 0) ShowErr("Impossibile ottenere il tempo della macchina");
 
-    #ifdef WIN32
+    #ifdef _WIN32
     localtime_s(&timeinfo, &rawtime);
     if (errno) ShowErr("Impossibile convertire il tempo locale");
     #else //__linux___
     if (localtime_r(&rawtime, &timeinfo) == NULL) ShowErr("Impossibile convertire il tempo locale");
     #endif
 
-
     strftime(time_stamp, sizeof(time_stamp), "%d-%m-%Y %H:%M:%S", &timeinfo);
 
     //ip:port
     sockaddr_in client;
     socklen_t s = sizeof(client);
-    getsockname(soc, (sockaddr*)&client, &s);
+    getpeername(soc, (sockaddr*)&client, &s);
 
     char ip[17] = { 0 };
     inet_ntop(AF_INET, &client.sin_addr, ip, 17);
@@ -509,7 +490,7 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
     fflush(FileDescLog);
 
 
-#ifdef WIN32
+#ifdef _WIN32
     LeaveCriticalSection(&FileLock);
 #else
     // TODO: pthread exit critical
@@ -551,6 +532,7 @@ void* SigHandler (void* dummy){
 // Dopo che un thread viene creato esegue questa funzione
 void* Accept(void* rank) {
     #ifdef __linux__
+    // ignoro i segnali SIGUP e SIGINT
     sigset_t sigset;
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGHUP);
@@ -561,17 +543,15 @@ void* Accept(void* rank) {
     srand(time(NULL));
 
     SOCKET socket_descriptor;
-
     unsigned long int Tpid = 0;
-
-    #ifdef WIN32
+    // ottendo il thread id
+    #ifdef _WIN32
     Tpid = GetCurrentThreadId();
     #else
     Tpid = syscall(__NR_gettid);
     #endif
 
     while (1) {
-
         // i thread vanno a dormire
         #ifdef _WIN32
         EnterCriticalSection(&CritSec);
@@ -618,180 +598,195 @@ void* Accept(void* rank) {
 }
 
 int Autenticazione(SOCKET socket_descriptor) {
-  /*
-  1. ricevere HELO
-  2. generare challenge
-      challenge = T_s XOR rand
-  3. inviare challenge
-  4. ricevere AUTH dal client
-  5. risolve l'auth e risponde nel caso 200 o 400
-  risposte ai comandi + log
-  */
-  unsigned long int T_c = 0;
-  unsigned long int nonce = 0;
-  unsigned long int challenge = 0;
-  unsigned long int challenge_nonce = 0;
+    /*
+    1. ricevere HELO
+    2. generare challenge
+        challenge = T_s XOR rand
+    3. inviare status e challenge
+    4. ricevere AUTH dal client
+    5. risolve l'auth e risponde nel caso 200 o 400
+    risposte ai comandi + log
+    */
 
-  char* endP = NULL;
-  char* next_tok = NULL;
+    unsigned long int T_c = 0;
+    unsigned long int nonce = 0;
+    unsigned long int challenge = 0;
+    unsigned long int challenge_nonce = 0;
 
-  char _t[1024] = { 0 };
-  char _auth[1024] = { 0 };
-  char _command[1024] = { 0 };
-  // passo 1
-  Recv(socket_descriptor, _t);
+    char* endP = NULL;
+    char* next_tok = NULL;
 
-  if (strncmp(_t, "HELO", 4) != 0) {
-      closesocket(socket_descriptor);
-      return 1;
-  }
-  memset(_t, '\0', 1024);
+    char helo[5] = { 0 }; // ricevo HELO
 
-  // passo 2,3,4
-  nonce = rand() % 2147483647; // nonce
-  challenge = T_s ^ nonce; // T_s XOR nonce
+    char* chall = NULL; // spedisco la challenge
+    int _challLen = 0; // lunghezza challenge
 
-  snprintf(_t, 1024, "%lu", challenge); // unsigned long int to string
+    char* auth = (char*)Calloc(1024, sizeof(char));
+    int _authLen = 0;
 
-  Send_Recv(socket_descriptor, _auth, _t, "300"); // invio lo status e challenge, ottengo l'auth
+    char* authResponse = NULL;
+
+    // passo 1 ////////////////////////////////////////////////////
+    Recv(socket_descriptor, helo, 5); // ricevo HELO
+    if (strncmp(helo, "HELO", 4) != 0) {
+        closesocket(socket_descriptor);
+        return 1;
+    }
+    ///////////////////////////////////////////////////////////////
+
+    // passo 2,3 //////////////////////////////////////////////////
+    nonce = rand() % 2147483647; // nonce
+    challenge = T_s ^ nonce; // T_s XOR nonce | genero challenge
+
+    _challLen = Asprintf(chall, "%lu", challenge); // unsigned long to string
+
+    Send(socket_descriptor, "300", 4); // invio status
+    Send(socket_descriptor, chall, _challLen); // invio challenge
+    Free(chall, _challLen);
+    ///////////////////////////////////////////////////////////////
+
+    // passo 4 ////////////////////////////////////////////////////
+    if ((_authLen = Recv(socket_descriptor, auth, 1024)) <= 0) {
+        return 1;
+    }
+    authResponse = (char*)Calloc(_authLen, sizeof(char));
+    ///////////////////////////////////////////////////////////////
+
+    // passo 5 ////////////////////////////////////////////////////
+    // AUTH
+    if (strncmp(strtok_r(authResponse, " ;", &next_tok), "AUTH", 4) != 0) {
+        closesocket(socket_descriptor);
+        return 1;
+    }
+
+    // enc1 
+    // T_s XOR nonce XOR T_c
+    T_c = T_s ^ nonce ^ strtoul(strtok_r(NULL, " ;", &next_tok), &endP, 10);
+
+    // enc2
+    // T_c XOR nonce
+    challenge_nonce = T_c ^ strtoul(strtok_r(NULL, " ;", &next_tok), &endP, 10);
 
 
-  // passo 5
-  Strcpy(_command, 1024, strtok_r(_auth, " ;", &next_tok)); // AUTH
+    Free(authResponse, _authLen);
+    if (challenge_nonce != nonce) {
+        // challenge rifiutata
+        Send(socket_descriptor, "400", 4);
+        closesocket(socket_descriptor);
+#ifdef _DEBUG
+        printf("\nClient Rifiutato\n");
+#endif
+        return 1;
+    }
+    Send(socket_descriptor, "200", 4); // challenge accettata
 
-  if (strncmp(_command, "AUTH", 4) != 0) {
-      closesocket(socket_descriptor);
-      return 1;
-  }
+#ifdef _DEBUG
+    printf("\nClient Accettato\n");
+#endif
 
-  // enc1
-  Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok)); // T_s XOR nonce XOR T_c
-  T_c = T_s ^ nonce ^ strtoul(_command, &endP, 10);
-
-  // enc2
-  Strcpy(_command, 1024, strtok_r(NULL, " ;", &next_tok)); // T_c XOR nonce
-  challenge_nonce = T_c ^ strtoul(_command, &endP, 10);
-
-  if (challenge_nonce != nonce) {
-      Send(socket_descriptor, "400");
-      closesocket(socket_descriptor);
-      printf("\nClient Rifiutato\n");
-      return 1;
-  }
-  Send(socket_descriptor, "200"); // nonce accettato
-
-  printf("\nClient Accettato\n");
-
-
-  return 0;
+    return 0;
 }
 
 void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
   char* command = (char*)Calloc(1024, sizeof(char));
-  char* dup_cmd = (char*)Calloc(1024, sizeof(char));
+  int _commandLen = 1024;
+  char* dup_cmd = NULL;
   char* brkt = NULL;
-  while (Recv(socket_descriptor, command) == 0) {
-      brkt = NULL;
-      Strcpy(dup_cmd, 1024, command);
+  char* cmd = NULL;
+  char* args = NULL;
 
-      command = strtok_r(command, " ", &brkt);
-      if (strncmp(command, "LSF", 3) == 0) {
-          command = strtok_r(NULL, " ", &brkt);
-          if (LSF(socket_descriptor, command) == 0) {
+  while ((_commandLen = Recv(socket_descriptor, command, _commandLen)) > 0) {
+      brkt = NULL;
+      cmd = NULL;
+      args = NULL;
+
+      // alloco e duplico il comando ricevuto
+      dup_cmd = (char*)Calloc(_commandLen, sizeof(char));
+      Strcpy(dup_cmd, _commandLen, command);
+
+      cmd = strtok_r(command, " ", &brkt);
+      args = strtok_r(NULL, " ", &brkt);
+      if (strncmp(cmd, "LSF", 3) == 0) {
+          if (LSF(socket_descriptor, args) == 0) {
               writeLog(Tpid, socket_descriptor, dup_cmd);
           }
       }
-      if (strncmp(command, "EXEC", 4) == 0) {
-          command = strtok_r(NULL, "", &brkt);
-          if (EXEC(socket_descriptor, command) == 0) {
+      if (strncmp(cmd, "EXEC", 4) == 0) {
+          if (EXEC(socket_descriptor, args) == 0) {
               writeLog(Tpid, socket_descriptor, dup_cmd);
           }
       }
-      if (strncmp(command, "DOWNLOAD", 8) == 0) {
-          command = strtok_r(NULL, "", &brkt);
-          if (DOWNLOAD(socket_descriptor, command) == 0) {
+      if (strncmp(cmd, "DOWNLOAD", 8) == 0) {
+          if (DOWNLOAD(socket_descriptor, args) == 0) {
               writeLog(Tpid, socket_descriptor, dup_cmd);
           }
       }
-      if (strncmp(command, "SIZE", 4) == 0) {
-          command = strtok_r(NULL, "", &brkt);
-          if (SIZE_(socket_descriptor, command) == 0) {
+      if (strncmp(cmd, "SIZE", 4) == 0) {
+          if (SIZE_(socket_descriptor, args) == 0) {
               writeLog(Tpid, socket_descriptor, dup_cmd);
           }
       }
-      if (strncmp(command, "UPLOAD", 6) == 0) {
-          command = strtok_r(NULL, "", &brkt);
-          if (UPLOAD(socket_descriptor, command) == 0) {
+      if (strncmp(cmd, "UPLOAD", 6) == 0) {
+          if (UPLOAD(socket_descriptor, args) == 0) {
               writeLog(Tpid, socket_descriptor, dup_cmd);
           }
       }
       // altri comandi
 
-      memset(command, '\0', 1024);
-      memset(dup_cmd, '\0', 1024);
+      memset(command, '\0', _commandLen);
+      command = (char*)realloc(command, 1024);
+      Free(dup_cmd, _commandLen);
   }
-  
+
+  Free(command);
 }
 
 int LSF(SOCKET socket_descriptor, char* path) {
     if (!std::filesystem::exists(path)){
-        Send(socket_descriptor, "400");
+        Send(socket_descriptor, "400", 4);
         return 1;
     }
-    Send(socket_descriptor, "300");
+    Send(socket_descriptor, "300", 4);
     char* records = (char*)Calloc(1, sizeof(char));
+    int _recordsLen = 0;
     char* buffer = NULL;
-    int n = 0;
+    int _bufferLen = 0;
 
     std::error_code err;
-
 
     for (auto& p : std::filesystem::directory_iterator(path, std::filesystem::directory_options::skip_permission_denied)) {
 
         if (p.is_directory()) continue;
 
-
         std::filesystem::path file = p.path();
         uintmax_t size = std::filesystem::file_size(file, err);
-        if (err.value() != 0) {
-            continue;
-        }
+        if (err.value() != 0) continue;
 
-        #ifdef WIN32
+        _bufferLen = Asprintf(buffer, "%llu %ls\r\n", size, file.c_str());
 
-        n = snprintf(NULL, 0, "%llu %ls\r\n", size, file.c_str()) + 1; // taglia l'ultimo carattere
-        buffer = (char*)Calloc(n, sizeof(char));
-        snprintf(buffer, n, "%llu %ls\r\n", size, file.c_str());
 
-        #else
-        n = asprintf(&buffer, "%lu %s\r\n", size, file.c_str())+1;
-        #endif
-
-        int q = strlen(records);
-
-        if ((records = (char*)realloc(records, (q + n))) == NULL) {
+        if ((records = (char*)realloc(records, (_recordsLen + _bufferLen))) == NULL) {
             ShowErr("Impossibile allocare memoria per i file della funzione LSF");
         }
 
-        #ifdef WIN32
-        strcat_s(records, strlen(records)+n, buffer);
-        if (errno) {
-            ShowErr("Errore in strcat dentro LSF");
-        }
+        #ifdef _WIN32
+        strcat_s(records, _recordsLen + _bufferLen, buffer);
+        if (errno) ShowErr("Errore in strcat dentro LSF");
         #else
         strcat(records, buffer);
         #endif
 
-        Free(buffer, strlen(buffer));
+        _recordsLen += _bufferLen;
+        Free(buffer, _bufferLen);
 
     }
 
-    if ((records = (char*)realloc(records, strlen(records) + sizeof(" \r\n.\r\n"))) == NULL) {
+    if ((records = (char*)realloc(records, _recordsLen + sizeof(" \r\n.\r\n"))) == NULL) {
         ShowErr("Impossibile reallocare memoria");
     }
 
-    #ifdef WIN32
-    strcat_s(records, strlen(records) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
+    #ifdef _WIN32
+    strcat_s(records, _recordsLen + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
     #else
     strncat(records, " \r\n.\r\n", sizeof(" \r\n.\r\n")+1);
     #endif
@@ -799,7 +794,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
     SendAll(socket_descriptor, records);
 
 
-    Free(records, strlen(records)+1);
+    Free(records, _recordsLen);
     return 0;
 }
 
@@ -815,7 +810,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         strcmp(command, "printworkdir") &&
         strcmp(command, "sort")) {
 
-        Send(socket_descriptor, "400");
+        Send(socket_descriptor, "400", 4);
         return 1;
 
     }
@@ -846,13 +841,13 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         }
         // copy  || copy path1
         if (i < 2) {
-            Send(socket_descriptor, "400");
+            Send(socket_descriptor, "400", 4);
             return 1;
         }
 
         // copy path1 path2 path3
         if (i > 2 && !std::filesystem::is_directory(list[i-1])) {
-            Send(socket_descriptor, "400");
+            Send(socket_descriptor, "400", 4);
             return 1;
         }
 
@@ -867,7 +862,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                     continue;
                 }
 
-                #ifdef WIN32
+                #ifdef _WIN32
                 n = snprintf(NULL, 0, "%s\r\n", list[k]) + 1; // taglia l'ultimo carattere
                 buffer = (char*)Calloc(n, sizeof(char));
                 sprintf_s(buffer, n, "%s\r\n", list[k]);
@@ -880,7 +875,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                     ShowErr("Impossibile allocare memoria per i file della funzione LSF");
                 }
 
-                #ifdef WIN32
+                #ifdef _WIN32
                 strcat_s(result, strlen(result) + n, buffer);
                 if (errno) {
                     ShowErr("Errore in strcat dentro EXEC");
@@ -896,14 +891,14 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
         result = (char*)realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
 
-        #ifdef WIN32
+        #ifdef _WIN32
         strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
         #else
         strncat(result, " \r\n.\r\n", sizeof(" \r\n.\r\n") + 1);
         #endif
 
 
-        Send(socket_descriptor, "300");
+        Send(socket_descriptor, "300", 4);
         SendAll(socket_descriptor, result);
 
         Free(result);
@@ -936,7 +931,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         // remove
         if (i < 1) {
             Free(list);
-            Send(socket_descriptor, "400");
+            Send(socket_descriptor, "400",4);
             return 1;
         }
 
@@ -945,12 +940,12 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         for (int k = 0; k < i; k++) {
             if (std::filesystem::exists(list[k])) {
                 if (!std::filesystem::remove(list[k])) {
-                    Send(socket_descriptor, "400");
+                    Send(socket_descriptor, "400",4);
                     return 1;
                 }
 
 
-                #ifdef WIN32
+                #ifdef _WIN32
                 n = snprintf(NULL, 0, "%s\r\n", list[k]) + 1; // taglia l'ultimo carattere
                 buffer = (char*)Calloc(n, sizeof(char));
                 snprintf(buffer, n, "%s\r\n", list[k]);
@@ -962,7 +957,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                     ShowErr("Impossibile allocare memoria per i file della funzione LSF");
                 }
 
-                #ifdef WIN32
+                #ifdef _WIN32
                 strcat_s(result, strlen(result) + n, buffer);
                 if (errno) {
                     ShowErr("Errore in strcat dentro EXEC");
@@ -979,21 +974,21 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
         result = (char*)realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
 
-#ifdef WIN32
+#ifdef _WIN32
         strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
 #else
         strcat(result, " \r\n.\r\n");
 #endif
 
 
-        Send(socket_descriptor, "300");
+        Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result);
         Free(list);
     }
 
     // whoami
     if (strcmp(command, "whoami") == 0) {
-#ifdef WIN32
+#ifdef _WIN32
         unsigned long size = UNLEN + 1;
         result = (char*)Calloc(size, sizeof(char));
         if (!GetUserNameA(result, &size)) {
@@ -1011,13 +1006,13 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
         result = (char*)realloc(result, strlen(result) + sizeof("\r\n \r\n.\r\n"));
 
-#ifdef WIN32
+#ifdef _WIN32
         strcat_s(result, strlen(result) + sizeof("\r\n \r\n.\r\n"), "\r\n \r\n.\r\n");
 #else
         strcat(result, " \r\n.\r\n");
 #endif
 
-        Send(socket_descriptor, "300");
+        Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result);
 
 
@@ -1025,7 +1020,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
     // printworkdir
     if (strcmp(command, "printworkdir") == 0) {
-        #ifdef WIN32
+        #ifdef _WIN32
         int n = snprintf(NULL, 0, "%ls\r\n", std::filesystem::current_path().c_str())+1;
         result = (char*)Calloc(n, sizeof(char));
         sprintf_s(result, n, "%ls\r\n", std::filesystem::current_path().c_str());
@@ -1035,13 +1030,13 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
         result = (char*)realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
 
-        #ifdef WIN32
+        #ifdef _WIN32
         strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
         #else
         strcat(result, " \r\n.\r\n");
         #endif
 
-        Send(socket_descriptor, "300");
+        Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result);
     }
 
@@ -1051,23 +1046,23 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
         // sort
         if ((_t = strtok_r(NULL, " ", &fin)) == NULL) {
-            Send(socket_descriptor, "400");
+            Send(socket_descriptor, "400",4);
             return 1;
         }
 
         // sort <path>
         if (!std::filesystem::exists(_t)) {
-            Send(socket_descriptor, "400");
+            Send(socket_descriptor, "400",4);
             return 1;
         }
 
         // sort <dir>
         if (std::filesystem::is_directory(_t)) {
-            Send(socket_descriptor, "400");
+            Send(socket_descriptor, "400",4);
             return 1;
         }
 
-#ifdef WIN32
+#ifdef _WIN32
         int n = snprintf(NULL, 0, "sort %s", _t) + 1;
         buffer = (char*)Calloc(n, sizeof(char));
         sprintf_s(buffer, n, "sort %s", _t);
@@ -1076,7 +1071,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 #endif
 
         result = _exec(buffer);
-        Send(socket_descriptor, "300");
+        Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result);
         Free(buffer, strlen(buffer)+1);
 
@@ -1092,19 +1087,19 @@ int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
 
 
     if ((path = strtok_r(cmd, ";", &Pend)) == NULL) {
-        Send(socket_descriptor, "400");
+        Send(socket_descriptor, "400",4);
         return 1;
     }
     if ((size = strtok_r(NULL, ";", &Pend)) == NULL) {
-        Send(socket_descriptor, "400");
+        Send(socket_descriptor, "400",4);
         return 1;
     }
     if (std::filesystem::exists(path)) {
-        Send(socket_descriptor, "400");
+        Send(socket_descriptor, "400",4);
         return 1;
     }
 
-    // TODO: ???
+    // TODO: ricevere size byte
 
     return 0;
 }
@@ -1112,7 +1107,7 @@ int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
 int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
 
     if (!std::filesystem::exists(path)) {
-        Send(socket_descriptor, "400");
+        Send(socket_descriptor, "400",4);
         return 1;
     }
 
@@ -1121,25 +1116,25 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
     unsigned long long size = std::filesystem::file_size(path, err);
 
     if (err.value() != 0) {
-        Send(socket_descriptor, "400");
+        Send(socket_descriptor, "400",4);
         return 1;
     }
 
-#ifdef WIN32
+#ifdef _WIN32
     sprintf_s(buffer, 1023, "%llu\r\n", size);
 #else
     snprintf(buffer, 1023, "%llu\r\n", size);
 #endif
 
 
-    Send(socket_descriptor, "300");
+    Send(socket_descriptor, "300",4);
     if (end) {
-        Send(socket_descriptor, buffer);
+        Send(socket_descriptor, buffer, 1023);
     }
     else {
         buffer = (char*)realloc(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"));
 
-#ifdef WIN32
+#ifdef _WIN32
         strcat_s(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
 #else
         strncat(buffer, " \r\n.\r\n", sizeof(" \r\n.\r\n") + 1);
@@ -1157,22 +1152,22 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
     unsigned long long sizeI;
 
     if ((path = strtok_r(cmd, ";", &Pend)) == NULL) {
-        Send(socket_descriptor, "400");
+        Send(socket_descriptor, "400",4);
         return 1;
     }
     if ((size = strtok_r(NULL, ";", &Pend)) == NULL) {
-        Send(socket_descriptor, "400");
+        Send(socket_descriptor, "400",4);
         return 1;
     }
 
     sizeI = strtoul(size, &PendLU, 10);
 
     if (!std::filesystem::exists(path)) {
-        Send(socket_descriptor, "400");
+        Send(socket_descriptor, "400",4);
         return 1;
     }
     if (sizeI > std::filesystem::file_size(path)) {
-        Send(socket_descriptor, "400");
+        Send(socket_descriptor, "400",4);
         return 1;
     }
     if (SIZE_(socket_descriptor, path, 1) != 0) {
@@ -1181,7 +1176,7 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
 
     buffer = (char*)Calloc(sizeI+1, sizeof(char));
 
-#ifdef WIN32
+#ifdef _WIN32
     fopen_s(&_f, path, "r");
     if (errno) {
         ShowErr("Impossibile aprire file per UPLOAD");
@@ -1190,7 +1185,7 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
     _f = fopen(path, "r");
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
     fread_s(buffer, sizeI, 1, sizeI, _f);
 #else
     fread(buffer, 1, sizeI, _f);
@@ -1200,7 +1195,7 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
 
     buffer = (char*)realloc(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"));
 
-#ifdef WIN32
+#ifdef _WIN32
     strcat_s(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
 #else
     strncat(buffer, " \r\n.\r\n", sizeof(" \r\n.\r\n") + 1);
@@ -1226,7 +1221,7 @@ char* _exec(const char* cmd) {
             if (result == NULL) {
                 ShowErr("Impossibile allocare memoria per _exec");
             }
-#ifdef WIN32
+#ifdef _WIN32
             strcat_s(result, strlen(result) + strlen(buffer) + 1, buffer);
 #else
             strcat(result, buffer);
@@ -1244,7 +1239,7 @@ char* _exec(const char* cmd) {
         Free(result, strlen(result));
 
         char* _t = (char*)Calloc(100, sizeof(char));
-#ifdef WIN32
+#ifdef _WIN32
         sprintf_s(_t, 100, "%d", i);
 #else
         sprintf(_t, "%d", i);
@@ -1252,7 +1247,7 @@ char* _exec(const char* cmd) {
         return _t;
     }
 
-#ifdef WIN32
+#ifdef _WIN32
     strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
 #else
     strncat(result, " \r\n.\r\n", sizeof(" \r\n.\r\n") );
@@ -1283,7 +1278,7 @@ void SendAll(SOCKET soc, const char* str) {
             memcpy(buffer, str + i, 1023);
         }
 
-        Send(soc, buffer);
+        Send(soc, buffer, 1023);
     }
 
     /*
@@ -1303,29 +1298,63 @@ void SendAll(SOCKET soc, const char* str) {
     }
     */
 
-    Send(soc, "");
+    Send(soc, "", 0);
     Free(buffer, 1024);
 }
 
-void Send(SOCKET soc, const char* str) {
+void Send(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
 
     if (str == NULL) {
         return;
     }
+    if (bufferMaxLen == 0) {
+        return;
+    }
 
-    if (send(soc, str, 1023, 0) < 0) {
+    if (send(soc, str, bufferMaxLen, 0) < 0) {
         ShowErr("Errore nell'inviare un messaggio verso il server");
     }
 }
 
-int Recv(SOCKET soc, char* _return) {
-    if (recv(soc, _return, 1023, 0) <= 0) {
-        //ShowErr("Errore nel ricevere un messaggio dal client");
-        return 1;
+int Recv(SOCKET soc, char* _return, unsigned long long bufferMaxLen) {
+    if (bufferMaxLen == 0) {
+        return -1;
     }
-    return 0;
+    if (_return == NULL) {
+        return -1;
+    }
+    int len = 0;
+    int max = bufferMaxLen;
+    char* moreBuf = NULL;
+    
+    if ((len = recv(soc, _return, bufferMaxLen, 0)) <= 0) {
+        //ShowErr("Errore nel ricevere un messaggio dal client");
+        return -1;
+    }
+
+    if (_return[max - 1] != '\0') {
+        
+        moreBuf = (char*)Calloc(bufferMaxLen, sizeof(char));
+
+        while (_return[max - 1] != '\0') {
+            
+            if ((len = recv(soc, moreBuf, bufferMaxLen, 0)) <= 0) {
+                //ShowErr("Errore nel ricevere un messaggio dal client");
+                return -1;
+            }
+
+            _return = (char*)realloc(_return, max + len);
+            memcpy(_return + max, moreBuf, len);
+            max += len;
+        }
+        Free(moreBuf, bufferMaxLen);
+    }
+
+
+    return max;
 }
 
+/*
 void Send_Recv(SOCKET soc, char* _return, const char* str, const char* status) {
 
     if (status != NULL) {
@@ -1339,7 +1368,7 @@ void Send_Recv(SOCKET soc, char* _return, const char* str, const char* status) {
     Recv(soc, _return);
 
 }
-
+*/
 //////////////////////////////////////////////////////////////////////////////////
 // funzioni per gestire la pila di socket
 
@@ -1447,4 +1476,26 @@ void Strcpy(char* dest, unsigned int size, const char* src) {
     strncpy(dest, src, size);
 #endif
 
+}
+
+// asprintf Wrapper
+int Asprintf(char*& buffer, const char* Format, ...) {
+
+    if (buffer != NULL) {
+        ShowErr("Asprintf buffer deve essere un puntatore a NULL");
+    }
+    int n = 0;
+
+    va_list argptr;
+    va_start(argptr, Format);
+
+#ifdef _WIN32
+    n = vsnprintf(NULL, 0, Format, argptr) + 1;
+    buffer = (char*)Calloc(n, sizeof(char));
+    vsprintf_s(buffer, n, Format, argptr);
+#else
+    n = vasprintf(&authmsg, Format, argptr) + 1;
+#endif
+
+    return n;
 }
