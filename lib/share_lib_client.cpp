@@ -510,7 +510,7 @@ int SharedLibClient::Send_Recv(char* _return, const char* str, unsigned long lon
     return this->ReadAll(_return);
 }
 
-int SharedLibClient::ReadAll(char* ans){
+int SharedLibClient::ReadAll(char*& ans){
 
     if (ans != NULL) {
         ShowErr("Passare a ReadAll un puntatore nullo");
@@ -518,13 +518,17 @@ int SharedLibClient::ReadAll(char* ans){
 
     char* buffer_recv = (char*)Calloc(128, sizeof(char));
     ans = (char*)Calloc(1, sizeof(char));
-    int len_ans = 0,len = 0;
+    int len_ans = 1,len = 0;
 
     /*
     buffer lungo effettivamente 128, ma leggo solo 127 byte, l'ultimo sarà \0
     */
     while ((len = recv(this->socketClient, buffer_recv, 127, 0)) > 0) { // buffer_recv avrà \0 alla fine
         
+        if (len != strlen(buffer_recv)) {
+            len = strlen(buffer_recv);
+        }
+
         if ((ans = (char*)realloc(ans, len_ans + len)) == NULL) {
             ShowErr("Impossibile allocare memoria per il ReadAll");
         }
@@ -535,15 +539,13 @@ int SharedLibClient::ReadAll(char* ans){
         strcat(ans, buffer_recv);
 #endif
 
-        //memcpy(ans + len_ans, buffer_recv, strlen(buffer_recv)+1);
-        
-        if (_endingSequence(buffer_recv, 128)) {
-            break;
-        }
-
         // clean up
         memset(buffer_recv, '\0', len);
         len_ans += len;
+
+        if (_endingSequence(ans, len_ans)) {
+            break;
+        }
     }
 
     Free(buffer_recv);
@@ -568,12 +570,12 @@ void SharedLibClient::clearSocket() {
 #endif
 }
 
-bool SharedLibClient::_endingSequence(const char* buffer, unsigned long long size) {
+bool SharedLibClient::_endingSequence(char* buffer, unsigned long long size) {
     char sequence[7] = " \r\n.\r\n"; // conto anche \0
     if (size < 7) {
         return false;
     }
-
+    /*
     for (int i = 0; i < size - 7; i++) {
 
         if (strncmp(buffer + i, sequence, 7) == 0) {
@@ -581,6 +583,14 @@ bool SharedLibClient::_endingSequence(const char* buffer, unsigned long long siz
         }
 
     }
+    */
+
+    if (strncmp(buffer + size-7, sequence, 7) == 0) {
+        return true;
+    }
+
+
+
 
     return false;
 }

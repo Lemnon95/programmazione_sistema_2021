@@ -78,9 +78,9 @@ private:
 		char* status = NULL,
 		unsigned long long status_size = 0
 	);
-	int  ReadAll(char* ans);
+	int  ReadAll(char*& ans);
 
-	bool _endingSequence(const char* buffer, unsigned long long size);
+	bool _endingSequence(char* buffer, unsigned long long size);
 };
 
 // calloc Wrapper

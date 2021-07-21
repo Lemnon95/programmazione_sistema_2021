@@ -649,12 +649,12 @@ int Autenticazione(SOCKET socket_descriptor) {
     if ((_authLen = Recv(socket_descriptor, auth, 1024)) <= 0) {
         return 1;
     }
-    authResponse = (char*)Calloc(_authLen, sizeof(char));
+    //authResponse = (char*)Calloc(_authLen, sizeof(char));
     ///////////////////////////////////////////////////////////////
 
     // passo 5 ////////////////////////////////////////////////////
     // AUTH
-    if (strncmp(strtok_r(authResponse, " ;", &next_tok), "AUTH", 4) != 0) {
+    if (strncmp(strtok_r(auth, " ;", &next_tok), "AUTH", 4) != 0) {
         closesocket(socket_descriptor);
         return 1;
     }
@@ -668,7 +668,7 @@ int Autenticazione(SOCKET socket_descriptor) {
     challenge_nonce = T_c ^ strtoul(strtok_r(NULL, " ;", &next_tok), &endP, 10);
 
 
-    Free(authResponse, _authLen);
+    Free(auth, _authLen);
     if (challenge_nonce != nonce) {
         // challenge rifiutata
         Send(socket_descriptor, "400", 4);
@@ -705,29 +705,28 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
       Strcpy(dup_cmd, _commandLen, command);
 
       cmd = strtok_r(command, " ", &brkt);
-      args = strtok_r(NULL, " ", &brkt);
       if (strncmp(cmd, "LSF", 3) == 0) {
-          if (LSF(socket_descriptor, args) == 0) {
+          if (LSF(socket_descriptor, brkt) == 0) {
               writeLog(Tpid, socket_descriptor, dup_cmd);
           }
       }
       if (strncmp(cmd, "EXEC", 4) == 0) {
-          if (EXEC(socket_descriptor, args) == 0) {
+          if (EXEC(socket_descriptor, brkt) == 0) {
               writeLog(Tpid, socket_descriptor, dup_cmd);
           }
       }
       if (strncmp(cmd, "DOWNLOAD", 8) == 0) {
-          if (DOWNLOAD(socket_descriptor, args) == 0) {
+          if (DOWNLOAD(socket_descriptor, brkt) == 0) {
               writeLog(Tpid, socket_descriptor, dup_cmd);
           }
       }
       if (strncmp(cmd, "SIZE", 4) == 0) {
-          if (SIZE_(socket_descriptor, args) == 0) {
+          if (SIZE_(socket_descriptor, brkt) == 0) {
               writeLog(Tpid, socket_descriptor, dup_cmd);
           }
       }
       if (strncmp(cmd, "UPLOAD", 6) == 0) {
-          if (UPLOAD(socket_descriptor, args) == 0) {
+          if (UPLOAD(socket_descriptor, brkt) == 0) {
               writeLog(Tpid, socket_descriptor, dup_cmd);
           }
       }
@@ -755,6 +754,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
     std::error_code err;
 
     for (auto& p : std::filesystem::directory_iterator(path, std::filesystem::directory_options::skip_permission_denied)) {
+        buffer = NULL;
 
         if (p.is_directory()) continue;
 
@@ -781,17 +781,19 @@ int LSF(SOCKET socket_descriptor, char* path) {
 
     }
 
-    if ((records = (char*)realloc(records, _recordsLen + sizeof(" \r\n.\r\n"))) == NULL) {
+    _recordsLen += sizeof(" \r\n.\r\n");
+
+    if ((records = (char*)realloc(records, _recordsLen )) == NULL) {
         ShowErr("Impossibile reallocare memoria");
     }
 
     #ifdef _WIN32
-    strcat_s(records, _recordsLen + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
+    strcat_s(records, _recordsLen, " \r\n.\r\n");
     #else
-    strncat(records, " \r\n.\r\n", sizeof(" \r\n.\r\n")+1);
+    strncat(records, " \r\n.\r\n", sizeof(" \r\n.\r\n"));
     #endif
 
-    SendAll(socket_descriptor, records);
+    SendAll(socket_descriptor, records, _recordsLen);
 
 
     Free(records, _recordsLen);
@@ -820,13 +822,15 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
     // copy
     if (strcmp(command, "copy") == 0) {
-        int i = 0, n = 0;
+        int i = 0;
         char* _t = NULL, *buffer = NULL;
+        int _bufferLen = 0;
         char** list = (char**)Calloc(1, sizeof(char*)); // lista di stringhe
 
         result = (char*)Calloc(1, sizeof(char));
+        int _resultLen = 1;
 
-
+        // ottengo i parametri del comando copy e li metto nella variabile list
         while ((_t = strtok_r(NULL, " ", &fin)) != NULL) {
 
             if ((list[i] = (char*)Calloc(strlen(_t) + 1, sizeof(char))) == NULL) {
@@ -839,6 +843,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                 ShowErr("Errore nell'allocare lista in EXEC comando copy");
             }
         }
+        
         // copy  || copy path1
         if (i < 2) {
             Send(socket_descriptor, "400", 4);
@@ -856,55 +861,53 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         // copy path1 path2  ||  copy path1 path2 dir1
         for (int k = 0; k < i-1; k++) {
             if (std::filesystem::exists(list[k]) ){
+                // effettua la copia del file
                 std::filesystem::copy(list[k], list[i - 1], std::filesystem::copy_options::skip_existing, err);
                 if (err.value() != 0) {
+                    // se la copia va male passa al successivo
                     Free(list[k], strlen(list[k]));
                     continue;
                 }
 
-                #ifdef _WIN32
-                n = snprintf(NULL, 0, "%s\r\n", list[k]) + 1; // taglia l'ultimo carattere
-                buffer = (char*)Calloc(n, sizeof(char));
-                sprintf_s(buffer, n, "%s\r\n", list[k]);
-                #else
-                n = asprintf(&buffer, "%s\r\n", list[k]) + 1;
-                #endif
+                // componi la stringa
+                _bufferLen = Asprintf(buffer, "%s\r\n", list[k]);
 
-
-                if ((result = (char*)realloc(result, (strlen(result) + n))) == NULL) {
+                if ((result = (char*)realloc(result, (_resultLen + _bufferLen))) == NULL) {
                     ShowErr("Impossibile allocare memoria per i file della funzione LSF");
                 }
 
+                _resultLen += _bufferLen;
+
                 #ifdef _WIN32
-                strcat_s(result, strlen(result) + n, buffer);
-                if (errno) {
-                    ShowErr("Errore in strcat dentro EXEC");
-                }
+                strcat_s(result, _resultLen, buffer);
                 #else
                 strcat(result, buffer);
                 #endif
+                if (errno) {
+                    ShowErr("Errore in strcat dentro EXEC");
+                }
 
                 Free(list[k], strlen(list[k]));
-                Free(buffer, strlen(buffer));
+                Free(buffer, _bufferLen);
             }
         }
 
-        result = (char*)realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
+        _resultLen += sizeof(" \r\n.\r\n");
+
+        result = (char*)realloc(result, _resultLen);
 
         #ifdef _WIN32
-        strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
+        strcat_s(result, _resultLen, " \r\n.\r\n");
         #else
-        strncat(result, " \r\n.\r\n", sizeof(" \r\n.\r\n") + 1);
+        strncat(result, " \r\n.\r\n", sizeof(" \r\n.\r\n"));
         #endif
 
 
         Send(socket_descriptor, "300", 4);
-        SendAll(socket_descriptor, result);
+        SendAll(socket_descriptor, result, _resultLen);
 
-        Free(result);
+        Free(result, _resultLen);
         Free(list, i);
-
-
     }
 
     // remove
@@ -982,7 +985,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
 
         Send(socket_descriptor, "300",4);
-        SendAll(socket_descriptor, result);
+        SendAll(socket_descriptor, result, strlen(result));
         Free(list);
     }
 
@@ -1013,7 +1016,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 #endif
 
         Send(socket_descriptor, "300",4);
-        SendAll(socket_descriptor, result);
+        SendAll(socket_descriptor, result, strlen(result));
 
 
     }
@@ -1037,12 +1040,13 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         #endif
 
         Send(socket_descriptor, "300",4);
-        SendAll(socket_descriptor, result);
+        SendAll(socket_descriptor, result, strlen(result));
     }
 
     // sort
     if (strcmp(command, "sort") == 0) {
         char* _t = NULL, *buffer = NULL;
+        int _bufferLen = 0;
 
         // sort
         if ((_t = strtok_r(NULL, " ", &fin)) == NULL) {
@@ -1062,18 +1066,13 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             return 1;
         }
 
-#ifdef _WIN32
-        int n = snprintf(NULL, 0, "sort %s", _t) + 1;
-        buffer = (char*)Calloc(n, sizeof(char));
-        sprintf_s(buffer, n, "sort %s", _t);
-#else
-        asprintf(&buffer, "sort %s", _t);
-#endif
+        _bufferLen = Asprintf(buffer, "sort %s", _t);
+
 
         result = _exec(buffer);
         Send(socket_descriptor, "300",4);
-        SendAll(socket_descriptor, result);
-        Free(buffer, strlen(buffer)+1);
+        SendAll(socket_descriptor, result, strlen(result));
+        Free(buffer, _bufferLen);
 
     }
 
@@ -1139,7 +1138,7 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
 #else
         strncat(buffer, " \r\n.\r\n", sizeof(" \r\n.\r\n") + 1);
 #endif
-        SendAll(socket_descriptor, buffer);
+        SendAll(socket_descriptor, buffer, strlen(buffer));
     }
 
     return 0;
@@ -1201,7 +1200,7 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
     strncat(buffer, " \r\n.\r\n", sizeof(" \r\n.\r\n") + 1);
 #endif
 
-    SendAll(socket_descriptor, buffer);
+    SendAll(socket_descriptor, buffer, strlen(buffer)+1);
     Free(buffer);
     return 0;
 }
@@ -1258,21 +1257,19 @@ char* _exec(const char* cmd) {
 
 //////////////////////////////////////////////////////////////////////////////////
 
-
-void SendAll(SOCKET soc, const char* str) {
-    if (str == NULL) {
-        return;
-    }
-
-    unsigned long long size = strlen(str) + 1;
+// TODO: si può migliorare
+void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
+    if (soc <= 0) return;
+    if (str == NULL) return;
+    
     int point = 0;
     char* buffer = (char*)Calloc(1024, sizeof(char));
 
-    for (int i = 0; i < size; i += 1023) {
+    for (int i = 0; i < bufferMaxLen; i += 1023) {
         memset(buffer, '\0', 1024);
 
-        if (i + 1023 > size) {
-            memcpy(buffer, str + i, size - i);
+        if (i + 1023 > bufferMaxLen) {
+            memcpy(buffer, str + i, bufferMaxLen - i);
         }
         else {
             memcpy(buffer, str + i, 1023);
@@ -1281,24 +1278,6 @@ void SendAll(SOCKET soc, const char* str) {
         Send(soc, buffer, 1023);
     }
 
-    /*
-    while ((point*1024) < size) {
-        memset(buffer, '\0', 1024);
-        if ((point * 1024) - size > 0) {
-            memcpy(buffer, str + (point * 1024), size - (point * 1024) );
-        }
-        else {
-            memcpy(buffer, str + (point * 1024), 1024);
-        }
-
-
-        Send(soc, buffer);
-        point++;
-
-    }
-    */
-
-    Send(soc, "", 0);
     Free(buffer, 1024);
 }
 
