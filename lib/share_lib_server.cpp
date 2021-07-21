@@ -1110,25 +1110,20 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
         return 1;
     }
 
-    char* buffer = (char*)Calloc(1024, sizeof(char));;
+    char* buffer = NULL;
+    int _bufferLen = 0;
     std::error_code err;
     unsigned long long size = std::filesystem::file_size(path, err);
-
     if (err.value() != 0) {
         Send(socket_descriptor, "400",4);
         return 1;
     }
 
-#ifdef _WIN32
-    sprintf_s(buffer, 1023, "%llu\r\n", size);
-#else
-    snprintf(buffer, 1023, "%llu\r\n", size);
-#endif
-
+    _bufferLen = Asprintf(buffer, "%llu\r\n", size);
 
     Send(socket_descriptor, "300",4);
     if (end) {
-        Send(socket_descriptor, buffer, 1023);
+        Send(socket_descriptor, buffer, _bufferLen);
     }
     else {
         buffer = (char*)realloc(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"));
