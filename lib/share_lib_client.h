@@ -1,10 +1,15 @@
 #pragma once
 
+#define MAX_PATH 260
+
+#include <iostream>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <string>
+#include <filesystem>
 #include <stdarg.h>
+
 
 #ifdef _WIN32
 #define _WINSOCKAPI_ 
@@ -26,8 +31,6 @@
 
 #endif // _WIN32
 
-#define MAX_PATH 260
-
 // parametri di configurazione
 struct params {
 	struct sockaddr_in server;
@@ -35,11 +38,11 @@ struct params {
 	char* exec;
 	struct download {
 		char* src;
-		unsigned long long size;
+		char* dest;
 	} download;
 	struct upload {
 		char* src;
-		unsigned long long size;
+		char* dest;
 	} upload;
 };
 
@@ -70,15 +73,10 @@ private:
 	void UPLOAD();
 
 	void Send(const char* str, unsigned long long bufferMaxLen);
-	int Recv(char* _return, unsigned long long bufferMaxLen);
-	// TODO: DEPRECATE
-	int  Send_Recv(char* _return,
-		const char* str, 
-		unsigned long long send_size, 
-		char* status = NULL,
-		unsigned long long status_size = 0
-	);
+	void SendAll(const char* str, unsigned long long bufferMaxLen);
+	int  Recv(char* _return, unsigned long long bufferMaxLen);
 	int  ReadAll(char*& ans);
+	int  ReadMax(char*& ans, unsigned long long BufferMaxLen);
 
 	bool _endingSequence(char* buffer, unsigned long long size);
 };

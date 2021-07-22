@@ -91,7 +91,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
         }
 
-        // -d <src> <size>
+        // -d <src> <desc>
         if (strcmp(argv[argc], "-d") == 0) {
 
             if (argc + 1 >= maxArg) {
@@ -113,9 +113,8 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
             this->parametri.download.src = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
             this->parametri.download.src = argv[argc + 1];
 
-            //this->parametri.download.size = (char*)Calloc(sizeof(argv[argc + 2]) + 1, sizeof(char));
-            char* Pend = NULL;
-            this->parametri.download.size = strtoull(argv[argc + 2], &Pend, 10);
+            this->parametri.download.dest = (char*)Calloc(sizeof(argv[argc + 2]) + 1, sizeof(char));
+            this->parametri.download.dest = argv[argc + 2];
 
         }
 
@@ -141,9 +140,8 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
             this->parametri.upload.src = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
             this->parametri.upload.src = argv[argc + 1];
 
-            //this->parametri.upload.size = (char*)Calloc(sizeof(argv[argc + 2]) + 1, sizeof(char));
-            char* Pend = NULL;
-            this->parametri.upload.size = strtoull(argv[argc + 2], &Pend, 10);
+            this->parametri.upload.dest = (char*)Calloc(sizeof(argv[argc + 2]) + 1, sizeof(char));
+            this->parametri.upload.dest = argv[argc + 2];
 
         }
     }
@@ -153,15 +151,15 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
     }
 
 #ifdef _DEBUG
-    printf("\nserver: %d %d\nlsf: %s\nexec: %s\ndownload: %s %llu\nupload: %s %llu\n",
+    printf("\nserver: %d %d\nlsf: %s\nexec: %s\ndownload: %s %s\nupload: %s %s\n",
         this->parametri.server.sin_addr.s_addr,
         this->parametri.server.sin_port,
         this->parametri.lsf,
         this->parametri.exec,
         this->parametri.download.src,
-        this->parametri.download.size,
+        this->parametri.download.dest,
         this->parametri.upload.src,
-        this->parametri.upload.size
+        this->parametri.upload.dest
     );
 #endif // DEBUG
 
@@ -329,10 +327,10 @@ void SharedLibClient::GestioneComandi () {
   if (this->parametri.exec != NULL) {
       this->EXEC();
   }
-  if (this->parametri.download.src != NULL && this->parametri.download.size != 0 ) {
+  if (this->parametri.download.src != NULL && this->parametri.download.dest != NULL ) {
       this->DOWLOAD();
   }
-  if (this->parametri.upload.src != NULL && this->parametri.upload.size != 0) {
+  if (this->parametri.upload.src != NULL && this->parametri.upload.dest != NULL) {
       this->UPLOAD();
   }
 }
@@ -395,13 +393,24 @@ void SharedLibClient::EXEC() {
 }
 
 void SharedLibClient::DOWLOAD() {
-    
+    // download lato server
+    // upload lato client
+
+    if (!std::filesystem::exists(this->parametri.download.src)) {
+        ShowErr("file inserito per il download non presente");
+    }
+    if (std::filesystem::is_directory(this->parametri.download.src)) {
+        ShowErr("non puoi caricare una directory");
+    }
+
     char status[4] = { 0 };
     
     char* command = NULL;
     int _commandLen = 0;
 
-    _commandLen = Asprintf(command, "DOWNLOAD %s;%llu", this->parametri.download.src, this->parametri.download.size);
+    unsigned long long sizeI = std::filesystem::file_size(this->parametri.download.src);
+
+    _commandLen = Asprintf(command, "DOWNLOAD %s;%llu", this->parametri.download.dest, sizeI);
 
     this->Send(command, _commandLen);
     this->Recv(status, 4);
@@ -412,21 +421,83 @@ void SharedLibClient::DOWLOAD() {
         return;
     }
 
-    // TODO: invio X byte to server
+    
 
+    char* buffer = (char*)Calloc(sizeI+1, sizeof(char));
+
+    FILE* _f = NULL;
+
+#ifdef _WIN32
+    fopen_s(&_f, this->parametri.download.src, "r");
+    if (errno) {
+        ShowErr("Impossibile aprire file per UPLOAD");
+    }
+#else
+    _f = fopen(this->parametri.download.src, "r");
+#endif
+
+#ifdef _WIN32
+    fread_s(buffer, sizeI, 1, sizeI, _f);
+#else
+    fread(buffer, 1, sizeI, _f);
+#endif
+
+    fclose(_f);
+    
+
+    Send(buffer, sizeI);
+    Free(buffer);
 }
 
 void SharedLibClient::UPLOAD() {
+    // upload lato server
+    // download lato client
+
+    if (std::filesystem::exists(this->parametri.upload.dest)) {
+        ShowErr("File destinazione già presente");
+    }
     
     char status[4] = {0};
 
     char* command = NULL;
     int _commandLen = 0;
 
+    char* sizeCmd = NULL;
+    int _sizeCmdLen = 0;
+
+    char* size = NULL;
+    int _sizeLen = 0;
+
+    char* endP = NULL;
+
+    unsigned long long sizeI;
+
     char* ans = NULL;
     int _ansLen = 0;
 
-    _commandLen = Asprintf(command, "UPLOAD %s;%llu", this->parametri.upload.src, this->parametri.upload.size);
+    // Invio SIZE per sapere la dimensione del file
+    _sizeCmdLen = Asprintf(sizeCmd, "SIZE %s", this->parametri.upload.src);
+    this->Send(sizeCmd, _sizeCmdLen);
+    Free(sizeCmd, _sizeCmdLen);
+    // se percorso esiste allora 300
+    this->Recv(status, 4);
+    if (strncmp(status, "300", 3) != 0) {
+        Free(status, 4);
+        printf("Errore nell'esecuzione di SIZE\n");
+        return;
+    }
+    
+    // ottengo il peso del file
+    size = (char*)Calloc(128, sizeof(char));
+    _sizeLen = this->Recv(size, 128);
+
+    // peso del file in fomrato integer
+    sizeI = strtoull(size, &endP, 10);
+    Free(size, _sizeLen);
+
+    ////////////////
+
+    _commandLen = Asprintf(command, "UPLOAD %s;%llu", this->parametri.upload.src, sizeI);
 
     this->Send(command, _commandLen);
     this->Recv(status, 4);
@@ -438,13 +509,28 @@ void SharedLibClient::UPLOAD() {
         return;
     }
 
-    _ansLen = this->ReadAll(ans);
+    // leggo al massimo sizeI caratteri (o byte)
+    _ansLen = this->ReadMax(ans, sizeI);
 
-    printf("\n%s\n", ans);
+    FILE* _f;
+#ifdef _WIN32
+    fopen_s(&_f, this->parametri.upload.dest, "w");
+#else
+    _f = fopen(this->parametri.upload.dest, "w");
+#endif
+    if (errno) {
+        ShowErr("Impossibile aprire file in DOWNLOAD");
+    }
+
+    fwrite(ans, 1, _ansLen, _f);
+
+    fclose(_f);
+
+    //printf("\n%s\n", ans);
     Free(ans, _ansLen);
 }
 
-///////////////
+///////////////////////////////////////
 
 void SharedLibClient::Send(const char* str, unsigned long long bufferMaxLen) {
 
@@ -458,6 +544,30 @@ void SharedLibClient::Send(const char* str, unsigned long long bufferMaxLen) {
     if (send(this->socketClient, str, bufferMaxLen, 0) <= 0) {
         ShowErr("Errore nell'inviare un messaggio verso il server");
     }
+}
+
+// TODO: si può migliorare
+void SharedLibClient::SendAll(const char* str, unsigned long long bufferMaxLen) {
+    if (this->socketClient <= 0) return;
+    if (str == NULL) return;
+
+    int point = 0;
+    char* buffer = (char*)Calloc(1024, sizeof(char));
+
+    for (int i = 0; i < bufferMaxLen; i += 1023) {
+        memset(buffer, '\0', 1024);
+
+        if (i + 1023 > bufferMaxLen) {
+            memcpy(buffer, str + i, bufferMaxLen - i);
+        }
+        else {
+            memcpy(buffer, str + i, 1023);
+        }
+
+        Send(buffer, 1023);
+    }
+
+    Free(buffer, 1024);
 }
 
 int SharedLibClient::Recv(char* _return, unsigned long long bufferMaxLen) {
@@ -499,17 +609,6 @@ int SharedLibClient::Recv(char* _return, unsigned long long bufferMaxLen) {
 
 }
 
-int SharedLibClient::Send_Recv(char* _return, const char* str, unsigned long long send_size, char* status, unsigned long long status_size) {
-
-    this->Send(str, send_size);
-
-    if (status != NULL) {
-        this->Recv(status, status_size);
-    }
-
-    return this->ReadAll(_return);
-}
-
 int SharedLibClient::ReadAll(char*& ans){
 
     if (ans != NULL) {
@@ -543,7 +642,7 @@ int SharedLibClient::ReadAll(char*& ans){
         memset(buffer_recv, '\0', len);
         len_ans += len;
 
-        if (_endingSequence(ans, len_ans)) {
+        if (this->_endingSequence(ans, len_ans)) {
             break;
         }
     }
@@ -552,6 +651,52 @@ int SharedLibClient::ReadAll(char*& ans){
 
     return len_ans;
 }
+
+int SharedLibClient::ReadMax(char*& ans, unsigned long long BufferMaxLen) {
+
+    if (ans != NULL) {
+        ShowErr("Passare a ReadAll un puntatore nullo");
+    }
+
+    char* buffer_recv = (char*)Calloc(128, sizeof(char));
+    ans = (char*)Calloc(1, sizeof(char));
+    int len_ans = 1, len = 0;
+
+    /*
+    buffer lungo effettivamente 128, ma leggo solo 127 byte, l'ultimo sarà \0
+    */
+    while ((len = recv(this->socketClient, buffer_recv, 127, 0)) > 0) { // buffer_recv avrà \0 alla fine
+
+        if (len != strlen(buffer_recv)) {
+            len = strlen(buffer_recv);
+        }
+
+        if ((ans = (char*)realloc(ans, len_ans + len)) == NULL) {
+            ShowErr("Impossibile allocare memoria per il ReadAll");
+        }
+
+#ifdef _WIN32
+        strcat_s(ans, len_ans + len, buffer_recv);
+#else
+        strcat(ans, buffer_recv);
+#endif
+
+        // clean up
+        memset(buffer_recv, '\0', len);
+        len_ans += len;
+
+        if (len_ans+1 >= BufferMaxLen) {
+            break;
+        }
+    }
+
+    Free(buffer_recv);
+
+    return len_ans;
+
+}
+
+///////////////////////////////////////
 
 void SharedLibClient::clearSocket() {
     // se instanziato, chiudi il socket

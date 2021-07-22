@@ -1083,7 +1083,9 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
 int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
     char* path = NULL, * size = NULL, *Pend = NULL;
-
+    char* endP = NULL;
+    char* ans = NULL;
+    int _ansLen = 0;
 
     if ((path = strtok_r(cmd, ";", &Pend)) == NULL) {
         Send(socket_descriptor, "400",4);
@@ -1097,8 +1099,26 @@ int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
         Send(socket_descriptor, "400",4);
         return 1;
     }
+    unsigned long long sizeI = strtoull(size, &endP, 10);
+    Send(socket_descriptor, "300", 4);
 
-    // TODO: ricevere size byte
+    _ansLen = ReadMax(socket_descriptor, ans, sizeI);
+
+    FILE* _f;
+#ifdef _WIN32
+    fopen_s(&_f, path, "w");
+#else
+    _f = fopen(path, "w");
+#endif
+    if (errno) {
+        ShowErr("Impossibile aprire file in DOWNLOAD");
+    }
+
+    fwrite(ans, 1, _ansLen, _f);
+
+    fclose(_f);
+
+
 
     return 0;
 }
@@ -1122,10 +1142,10 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
     _bufferLen = Asprintf(buffer, "%llu\r\n", size);
 
     Send(socket_descriptor, "300",4);
-    if (end) {
+    //if (end) {
         Send(socket_descriptor, buffer, _bufferLen);
-    }
-    else {
+    //}
+    /*else {
         buffer = (char*)realloc(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"));
 
 #ifdef _WIN32
@@ -1134,7 +1154,8 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
         strncat(buffer, " \r\n.\r\n", sizeof(" \r\n.\r\n") + 1);
 #endif
         SendAll(socket_descriptor, buffer, strlen(buffer));
-    }
+    }*/
+        Free(buffer, _bufferLen);
 
     return 0;
 }
@@ -1154,7 +1175,7 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
         return 1;
     }
 
-    sizeI = strtoul(size, &PendLU, 10);
+    sizeI = strtoull(size, &PendLU, 10);
 
     if (!std::filesystem::exists(path)) {
         Send(socket_descriptor, "400",4);
@@ -1162,9 +1183,6 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
     }
     if (sizeI > std::filesystem::file_size(path)) {
         Send(socket_descriptor, "400",4);
-        return 1;
-    }
-    if (SIZE_(socket_descriptor, path, 1) != 0) {
         return 1;
     }
 
@@ -1187,15 +1205,9 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
 
     fclose(_f);
 
-    buffer = (char*)realloc(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"));
-
-#ifdef _WIN32
-    strcat_s(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
-#else
-    strncat(buffer, " \r\n.\r\n", sizeof(" \r\n.\r\n") + 1);
-#endif
-
-    SendAll(socket_descriptor, buffer, strlen(buffer)+1);
+    
+    Send(socket_descriptor, "300", 4);
+    Send(socket_descriptor, buffer, sizeI+1);
     Free(buffer);
     return 0;
 }
@@ -1328,21 +1340,97 @@ int Recv(SOCKET soc, char* _return, unsigned long long bufferMaxLen) {
     return max;
 }
 
-/*
-void Send_Recv(SOCKET soc, char* _return, const char* str, const char* status) {
+int ReadAll(SOCKET soc, char*& ans) {
 
-    if (status != NULL) {
-        Send(soc, status);
+    if (ans != NULL) {
+        ShowErr("Passare a ReadAll un puntatore nullo");
     }
 
-    if (str != NULL) {
-        Send(soc, str);
+    char* buffer_recv = (char*)Calloc(128, sizeof(char));
+    ans = (char*)Calloc(1, sizeof(char));
+    int len_ans = 1, len = 0;
+
+    /*
+    buffer lungo effettivamente 128, ma leggo solo 127 byte, l'ultimo sarà \0
+    */
+    while ((len = recv(soc, buffer_recv, 127, 0)) > 0) { // buffer_recv avrà \0 alla fine
+
+        if (len != strlen(buffer_recv)) {
+            len = strlen(buffer_recv);
+        }
+
+        if ((ans = (char*)realloc(ans, len_ans + len)) == NULL) {
+            ShowErr("Impossibile allocare memoria per il ReadAll");
+        }
+
+#ifdef _WIN32
+        strcat_s(ans, len_ans + len, buffer_recv);
+#else
+        strcat(ans, buffer_recv);
+#endif
+
+        // clean up
+        memset(buffer_recv, '\0', len);
+        len_ans += len;
+
+        if (_endingSequence(ans, len_ans)) {
+            break;
+        }
     }
 
-    Recv(soc, _return);
+    Free(buffer_recv);
+
+    return len_ans;
+}
+
+int ReadMax(SOCKET soc, char*& ans, unsigned long long BufferMaxLen) {
+
+    if (ans != NULL) {
+        ShowErr("Passare a ReadAll un puntatore nullo");
+    }
+
+    //char* buffer_recv = (char*)Calloc(128, sizeof(char));
+    ans = (char*)Calloc(BufferMaxLen, sizeof(char));
+    int len_ans = 1, len = 0;
+
+    len_ans = recv(soc, ans, BufferMaxLen, 0);
+
+    /*
+    buffer lungo effettivamente 128, ma leggo solo 127 byte, l'ultimo sarà \0
+    
+    while ((len = recv(soc, buffer_recv, 127, 0)) > 0) { // buffer_recv avrà \0 alla fine
+
+        if (len != strlen(buffer_recv)) {
+            len = strlen(buffer_recv);
+        }
+
+        if ((ans = (char*)realloc(ans, len_ans + len)) == NULL) {
+            ShowErr("Impossibile allocare memoria per il ReadAll");
+        }
+
+#ifdef _WIN32
+        strcat_s(ans, len_ans + len, buffer_recv);
+#else
+        strcat(ans, buffer_recv);
+#endif
+
+        // clean up
+        memset(buffer_recv, '\0', len);
+        len_ans += len;
+
+        if (len_ans + 1 >= BufferMaxLen) {
+            break;
+        }
+    }
+    */
+
+    //Free(buffer_recv);
+
+    return len_ans;
 
 }
-*/
+
+
 //////////////////////////////////////////////////////////////////////////////////
 // funzioni per gestire la pila di socket
 
@@ -1386,6 +1474,22 @@ int Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear) {
     size--;
     free(temp);
     return 0;
+}
+
+
+
+
+bool _endingSequence(char* buffer, unsigned long long size) {
+    char sequence[7] = " \r\n.\r\n"; // conto anche \0
+    if (size < 7) {
+        return false;
+    }
+
+    if (strncmp(buffer + size - 7, sequence, 7) == 0) {
+        return true;
+    }
+
+    return false;
 }
 
 //////////////////////////////////////////////////////////////////////////////////

@@ -253,19 +253,3 @@ Comandi Client
 Il progetto può essere sviluppato da una o da due persone.
 
 Al progetto andra' allegata una breve (5-10 pagine) relazione che descriva (e motivi) le scelte progettuali.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

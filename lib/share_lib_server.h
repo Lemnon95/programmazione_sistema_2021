@@ -146,13 +146,18 @@ char* _exec(const char* cmd);
 void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen);
 void Send(SOCKET soc, const char* str, unsigned long long bufferMaxLen);
 int Recv(SOCKET soc, char* _return, unsigned long long bufferMaxLen);
-int RecvAll(SOCKET soc, char* _return);
+int ReadAll(SOCKET soc, char*& ans);
+int ReadMax(SOCKET soc, char*& ans, unsigned long long BufferMaxLen);
 //void Send_Recv(SOCKET soc, char* _return, const char* str = NULL, const char* status = NULL);
 
 ////////////////////////////////////////////////////////////////////////////////////
 
 void Enqueue(SOCKET  socket_descriptor, Queue** front, Queue** rear);
 int  Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear);
+
+
+
+bool _endingSequence(char* buffer, unsigned long long size);
 
 ////////////////////////////////////////////////////////////////////////////////////
 

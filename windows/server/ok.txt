@@ -1,0 +1,255 @@
+Il sistema funziona sia su Windows, sia su Linux anche in modalità mista (server Windows, client Linux e viceversa).
+
+--std=C11
+
+https://www.geeksforgeeks.org/socket-programming-cc/
+https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/
+https://gist.github.com/FedericoPonzi/2a37799b6c601cce6c1b
+https://dzone.com/articles/parallel-tcpip-socket-server-with-multi-threading
+https://www.installsetupconfig.com/win32programming/threadprocesssynchronizationapis11_29.html
+
+---------------------------------------------------------------------
+Deamon sotto linux
+
+Linea di comando su windows
+---------------------------------------------------------------------
+client e server usano richiesta-risposta sincrono
+client e server usano autenticazione che permette solamente a client autorizzati di effettuare richieste al server
+
+parametri opzionali:
+
+	-p <TCP port>		porta TCP su cui stare in ascolto (default 8888);
+
+	-n <thread max>		numero massimo di thread per gestire le richieste (default 10);	
+
+	-c <path file>		percorso di configurazione;
+
+	-s					stampa su stdout il token T_s quando viene generato;
+
+	-l <path file>		percorso di log (default /tmp/server.log) 
+
+
+---------------------------------------------------------------------
+Avvio Server
+
+all'avvio chiede da terminale di inserire una master key (passphrase)
+	con la passphrase si genererà il token T_s
+
+Al termine del processo di generazione del token il buffer utilizzato per leggere la passphrase deve essere azzerato.
+
+il server si mette in attesa di connessioni sulla porta TCP 8888
+	modificabile tramite opzione (-p) 
+	modificabile tramite file di configurazione (-c)
+
+---------------------------------------------------------------------
+
+Il server crea inizialmente un pool di thread 
+	Il numero di thread è specificabile da linea comandi (opzione -n) o da file di configurazione. 
+
+Se nessun thread è disponibile per gestire una richiesta, la richiesta rimane in sospeso fino a quando un thread non è disponibile.
+
+---------------------------------------------------------------------
+
+i thread devono loggare sul file (-l) le richieste dai client autenticati (le richieste dai client dopo che hanno ricevuto il codice 200 a seguito del comando AUTH); 
+
+utilizzare un meccanismo di lock, per il file log, a scelta tra quelli visti durante il corso (Nella relazione finale, motivare la scelta)
+
+il file di log contiene una riga per ogni richiesta. Ogni riga contiene le seguenti informazioni:
+
+	[timestamp] [thpid] [ip:port] [command]
+
+
+
+timestamp: dataora/timestamp che identifichi quando è arrivata la richiesta
+
+thpid: id del thread che ha ricevuto la richiesta
+
+ip:port: indirizzo IP e porta del client
+
+command: il tipo di richiesta (LSF, EXEC, DOWNLOAD, SIZE, UPLOAD);
+
+---------------------------------------------------------------------
+in linux
+
+il server è in grado di rileggere il file di configurazione e, se necessario, modificare la porta TCP ed il numero massimo di thread. 
+	la rilettura è attivata quando il server riceve il segnale SIGHUP (kill -HUP <processID>)
+
+se non è specificato un file di configurazione, la ricezione del segnale SIGHUP non produrrà alcun effetto.
+
+---------------------------------------------------------------------
+
+protocollo di comunicazione tra client e server:
+
+	HELO 
+
+	AUTH <enc1;enc2>
+	: più avanti c'è l'algoritmo
+
+	LSF <path>
+	: richiede la lista di file e directory contenuti in path (non entra nelle eventuali sottocartelle).
+
+	EXEC <cmd num_args [args...] >
+	: esegue il comando specificato da cmd [args..]
+	: ritorna lo stdout del programma se questo termina correttamente (valore di ritorno = 0) 
+	: oppure il valore di ritorno nel caso ci sia stato un errore
+
+	DOWNLOAD <path;size>
+	: richiede che il server si prepari a ricevere un file di size byte e lo salvi sul path specificato.
+
+	SIZE <path>
+	: ritorna la dimensione in byte del file (unsigned long int) indicato da path. (É un comando ausiliario usato prima del comando UPLOAD per conoscere la dimensione in byte del file)
+
+	UPLOAD <path,size>
+	: richiede che il server invii i primi size byte del contenuto del file identificato da path.
+
+---------------------------------------------------------------------
+
+Stauts Code server
+
+	200
+	: indica che l'operazione è andata a buon fine. 
+
+	300
+	: indica che il server invierà ulteriore output. 
+	: Utilizzato per indicare l'invio della lista dei file come risposta dei comandi LSF e EXEC 
+	: per l’invio della challenge di autenticazione come risposta del comando HELO
+	: per l'invio della size del comando SIZE.
+
+	400
+	: indica che l'operazione ha prodotto un errore. Ad esempio il path non esiste, oppure il comando non esiste.
+
+---------------------------------------------------------------------
+Risposte comandi
+
+Il server in risposta al comando HELO:
+	invia il codice 300, a seguire un unsigned long int che rappresenta la challenge di autenticazione, come descritta in seguito nel protocollo di autenticazione.
+
+
+In riposta al comando SIZE 
+	invia il codice 300 a seguire un unsigned long int che rappresenta la size in byte del file richiesto.
+
+
+In risposta al comando LSF
+	il server invia il codice 300, a seguire, la lista dei file come una serie di record testuali (un record per ogni file) aventi la seguente struttura: 
+		<size in byte> <path>\r\n
+		...
+		 \r\n.\r\n		(spazio vuoto all'inizio della riga)
+
+
+In risposta al comando EXEC
+	il server invia il codice 300, a seguire: 
+		lo stdout se il programma ha terminato correttamente 
+		oppure 
+		il valore di ritorno nel caso ci sia stato un errore. 
+		
+		Il server invia il contenuto dello stdout una linea alla volta e alla fine conclude con la sequenza " \r\n.\r\n"; nel caso in cui il server invii il valore di ritorno lo invia su una linea, terminata con la sequenza " \r\n.\r\n" (spazio vuoto all'inizio della riga)
+
+		Il server deve supportare i seguenti comandi tramite la richiesta EXEC:
+
+		copy <src> [<src>...] <dst>
+		: copia src in dst. 
+		: Se ci sono più src, dst deve essere una directory
+
+		remove <file> [<file>...]
+		: rimuove il/i file che sono passati come argomenti
+
+		whoami
+		: stampa (il nome) utente
+
+		printworkdir
+		: ritorna la working directory (CWD)
+
+		sort <file>
+		: stampa il contenuto di file ordinato lessicograficamente
+
+---------------------------------------------------------------------
+Autenticazione
+
+definizione della funzione:
+	unsigned long int generateToken(const char *passphrase)
+	: passphrase di lunghezza variabile
+	: funzione hash, stesso input stesso output
+
+
+IN PRIMIS
+
+
+Il server chiama la funzione generateToken per calcolare, 
+	a partire dalla server-passphrase il token T_s che identifica il server
+	
+	passphrase -> generateToken() -> T_s (unsigned long int)
+
+
+ogni client richede l'inserimento di due passphrase
+	: quella utilizzata all'avvio del server server-passphrase (T_s)
+	: una specifica per ogni client, client-passphrase. 
+
+Queste passphrase saranno utilizzate per la procedura di autenticazione.
+
+
+i client usano la funzione generateToken per calcolare il token T_s usnado:
+	: server-passphrase 
+	: T_c_i (a partire dalla client_i-passphrase)
+	
+	client_i-passphrase -> generateToken() -> T_c_i (unsigned long int)
+
+
+Il protocollo di autenticazione prevede i seguenti passi:
+
+	1. Il client invia un messaggio di HELO
+
+	2. il server risponde con un codice di risposta 300
+		invia poi un unsigned long int che contiene la challenge.
+		Il valore che viene inviato dal server è calcolato effettuando:
+			challenge = T_s XOR nonce
+				La nonce è un unsigned long int scelto random dal server
+
+
+	3. Il client estrae la challenge
+		utilizzando il valore di T_s che ha calcolato in primis 
+		Invia poi al server un messaggio AUTH <enc1;enc2> dove:
+		: enc1_c=(T_s 	XOR challenge XOR T_c_i ) 
+		: enc2_c=(T_c_i XOR challenge)
+
+	4. Il server 
+		estrae da enc1 la chiave T_c_i ( enc1 XOR T_s )
+		usa T_c_i per verificare enc2 ed estrarre la challenge
+			se il valore è corretto risponde con un codice 200 
+			altrimenti 
+			con un codice 400 e chiude la comunicazione.
+
+---------------------------------------------------------------------
+Comandi Client
+
+	-h <ip>
+	: ip del server dove connettersi
+	
+	
+	-p <port> 		(default 8888)
+	: porta del server dove connettersi
+
+
+	-l <path> 
+	: richiede la lista dei file presenti nella cartella (corrisponde al comando LST)
+
+
+	-e <cmd [args ...]>
+	: richiede che venga eseguito sul server il comando specificato da cmd [args..] e che venga ritornato il valore di ritorno di esecuzione del comando (corrisponde al comando EXEC)
+	
+
+	-d <src-path> <size> 
+	: richiede che il server si prepari a ricevere il file identificato su <src-path> (server) dei primi <size> byte (server) (corrisponde al comando DOWNLOAD);
+
+
+	-u <src-path> <size>
+	: richiede che il server invii identificato da <src-path> (server) deu primi <size> byte (server) (corrisponde al comando UPLOAD).
+	
+
+---------------------------------------------------------------------
+
+
+
+
+Il progetto può essere sviluppato da una o da due persone.
+
+Al progetto andra' allegata una breve (5-10 pagine) relazione che descriva (e motivi) le scelte progettuali.                                                                                                                                                                                                                                                              
