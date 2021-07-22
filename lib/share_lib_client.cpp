@@ -822,7 +822,7 @@ int Asprintf(char*& buffer, const char* Format, ...) {
     buffer = (char*)Calloc(n, sizeof(char));
     vsprintf_s(buffer, n, Format, argptr);
 #else
-    n = vasprintf(&authmsg, Format, argptr) + 1;
+    n = vasprintf(&buffer, Format, argptr) + 1;
 #endif
 
     return n;

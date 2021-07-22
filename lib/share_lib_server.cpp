@@ -339,8 +339,9 @@ void spawnSockets() {
     
     #ifdef __linux__
     // spawno 1 thread che gestisce i segnali:
-    if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
+    /*if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
         printf("Failed to create signal handling thread\n");
+        */
     #endif
 
 
@@ -512,7 +513,7 @@ void closeLog() {
 //////////////////////////////////////////////////////////////////////////////////
 #ifdef __linux__
 //funzione per il thread dedicato a gestire i segnali
-void* SigHandler (void* dummy){
+/*void* SigHandler(void* dummy) {
   sigset_t sigset;
   sigemptyset(&sigset);
   sigaddset(&sigset, SIGHUP);
@@ -526,7 +527,7 @@ void* SigHandler (void* dummy){
       break;
   }
   return NULL;
-}
+}*/
 #endif
 
 // Dopo che un thread viene creato esegue questa funzione
@@ -759,10 +760,16 @@ int LSF(SOCKET socket_descriptor, char* path) {
         if (p.is_directory()) continue;
 
         std::filesystem::path file = p.path();
-        uintmax_t size = std::filesystem::file_size(file, err);
+        unsigned long long size = std::filesystem::file_size(file, err);
         if (err.value() != 0) continue;
 
+#ifdef _WIN32
         _bufferLen = Asprintf(buffer, "%llu %ls\r\n", size, file.c_str());
+#else
+        _bufferLen = Asprintf(buffer, "%llu %s\r\n", size, &(file.c_str())[0]);
+#endif // _WIN32
+
+        
 
 
         if ((records = (char*)realloc(records, (_recordsLen + _bufferLen))) == NULL) {
@@ -947,14 +954,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                     return 1;
                 }
 
-
-                #ifdef _WIN32
-                n = snprintf(NULL, 0, "%s\r\n", list[k]) + 1; // taglia l'ultimo carattere
-                buffer = (char*)Calloc(n, sizeof(char));
-                snprintf(buffer, n, "%s\r\n", list[k]);
-                #else
-                n = asprintf(&buffer, "%s\r\n", list[k]) + 1;
-                #endif
+                int _bufferLen = Asprintf(buffer, "%s\r\n", list[k]);
 
                 if ((result = (char*)realloc(result, (strlen(result) + n))) == NULL) {
                     ShowErr("Impossibile allocare memoria per i file della funzione LSF");
@@ -1023,24 +1023,22 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
     // printworkdir
     if (strcmp(command, "printworkdir") == 0) {
-        #ifdef _WIN32
-        int n = snprintf(NULL, 0, "%ls\r\n", std::filesystem::current_path().c_str())+1;
-        result = (char*)Calloc(n, sizeof(char));
-        sprintf_s(result, n, "%ls\r\n", std::filesystem::current_path().c_str());
-        #else
-        asprintf(&result, "%s\r\n", std::filesystem::current_path().c_str());
-        #endif
 
-        result = (char*)realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
+        int _resultLen = Asprintf(result, "%s\r\n", std::filesystem::current_path().c_str());
+
+
+        result = (char*)realloc(result, _resultLen + sizeof(" \r\n.\r\n"));
 
         #ifdef _WIN32
-        strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
+        strcat_s(result, _resultLen + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
         #else
         strcat(result, " \r\n.\r\n");
         #endif
 
+        _resultLen += sizeof(" \r\n.\r\n");
+
         Send(socket_descriptor, "300",4);
-        SendAll(socket_descriptor, result, strlen(result));
+        SendAll(socket_descriptor, result, _resultLen);
     }
 
     // sort
@@ -1567,13 +1565,31 @@ int Asprintf(char*& buffer, const char* Format, ...) {
     va_list argptr;
     va_start(argptr, Format);
 
+    vprintf(Format, argptr);
+
+    
+
+    
+
 #ifdef _WIN32
     n = vsnprintf(NULL, 0, Format, argptr) + 1;
     buffer = (char*)Calloc(n, sizeof(char));
     vsprintf_s(buffer, n, Format, argptr);
 #else
-    n = vasprintf(&authmsg, Format, argptr) + 1;
+
+    /*
+    BUG:
+        il primo valore di argptr quando viene eseguito -l . (lista dei file nella dir)
+        il primo valore conterrebbe il size del file, esso è corrotto
+    
+    */
+
+
+    n = vasprintf(&buffer, Format, argptr);
+    //vsnprintf(buffer, n, Format, argptr);
 #endif
+
+    va_end(argptr);
 
     return n;
 }
