@@ -410,6 +410,7 @@ void SharedLibClient::DOWLOAD() {
 
     unsigned long long sizeI = std::filesystem::file_size(this->parametri.download.src);
 
+
     _commandLen = Asprintf(command, "DOWNLOAD %s;%llu", this->parametri.download.dest, sizeI);
 
     this->Send(command, _commandLen);
@@ -417,35 +418,32 @@ void SharedLibClient::DOWLOAD() {
 
     Free(command, _commandLen);
     if (strncmp(status, "300", 3) != 0) {
-        printf("Errore nell'esecuzione di DOWLOAD\n");
+        printf("Errore ricevuto dal server\n");
         return;
     }
-
-    
 
     char* buffer = (char*)Calloc(sizeI+1, sizeof(char));
 
     FILE* _f = NULL;
 
 #ifdef _WIN32
-    fopen_s(&_f, this->parametri.download.src, "r");
-    if (errno) {
-        ShowErr("Impossibile aprire file per UPLOAD");
-    }
+    fopen_s(&_f, this->parametri.download.src, "rb");
 #else
-    _f = fopen(this->parametri.download.src, "r");
+    _f = fopen(this->parametri.download.src, "rb");
 #endif
+    if (_f == NULL) {
+        ShowErr("Impossibile aprire file per DOWNLOAD");
+    }
 
+    // può riempie ram
 #ifdef _WIN32
-    fread_s(buffer, sizeI, 1, sizeI, _f);
+    fread_s(buffer, sizeI+1, 1, sizeI, _f);
 #else
     fread(buffer, 1, sizeI, _f);
 #endif
 
     fclose(_f);
-    
-
-    Send(buffer, sizeI);
+    SendAll(buffer, sizeI);
     Free(buffer);
 }
 
@@ -532,6 +530,8 @@ void SharedLibClient::UPLOAD() {
 
 ///////////////////////////////////////
 
+// invia in blocco il buffer
+// da errore se il buffer è troppo grande
 void SharedLibClient::Send(const char* str, unsigned long long bufferMaxLen) {
 
     if (str == NULL) {
@@ -540,13 +540,13 @@ void SharedLibClient::Send(const char* str, unsigned long long bufferMaxLen) {
     if (bufferMaxLen == 0) {
         return;
     }
-
-    if (send(this->socketClient, str, bufferMaxLen, 0) <= 0) {
+    if ((send(this->socketClient, str, bufferMaxLen, 0)) <= 0) {
         ShowErr("Errore nell'inviare un messaggio verso il server");
     }
+    
 }
 
-// TODO: si può migliorare
+// invia blocchi da 1024 
 void SharedLibClient::SendAll(const char* str, unsigned long long bufferMaxLen) {
     if (this->socketClient <= 0) return;
     if (str == NULL) return;
@@ -554,22 +554,27 @@ void SharedLibClient::SendAll(const char* str, unsigned long long bufferMaxLen) 
     int point = 0;
     char* buffer = (char*)Calloc(1024, sizeof(char));
 
-    for (int i = 0; i < bufferMaxLen; i += 1023) {
+    // itero sulla size del buffer
+    for (int i = 0; i < bufferMaxLen; i += 1024) {
         memset(buffer, '\0', 1024);
 
-        if (i + 1023 > bufferMaxLen) {
+        // se rimane meno di 1024 byte nel buffer da inviare
+        if (i + 1024 > bufferMaxLen) {
+            // invia i rimanenti 
             memcpy(buffer, str + i, bufferMaxLen - i);
         }
         else {
-            memcpy(buffer, str + i, 1023);
+            // invia tutti i 1024
+            memcpy(buffer, str + i, 1024);
         }
 
-        Send(buffer, 1023);
+        Send(buffer, 1024);
     }
 
     Free(buffer, 1024);
 }
 
+// riceve finchè non trova \0
 int SharedLibClient::Recv(char* _return, unsigned long long bufferMaxLen) {
     if (bufferMaxLen == 0) {
         return -1;
@@ -609,6 +614,7 @@ int SharedLibClient::Recv(char* _return, unsigned long long bufferMaxLen) {
 
 }
 
+// riceve fino alla seguenza " \r\n.\r\n"
 int SharedLibClient::ReadAll(char*& ans){
 
     if (ans != NULL) {
@@ -652,6 +658,7 @@ int SharedLibClient::ReadAll(char*& ans){
     return len_ans;
 }
 
+// riceve fino a riempire il buffer
 int SharedLibClient::ReadMax(char*& ans, unsigned long long BufferMaxLen) {
 
     if (ans != NULL) {

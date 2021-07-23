@@ -337,8 +337,9 @@ void spawnSockets() {
 
     #ifdef __linux__
     // spawno 1 thread che gestisce i segnali:
-    if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
+    /*if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
         printf("Failed to create signal handling thread\n");
+        */
     #endif
 
 
@@ -511,7 +512,7 @@ void closeLog() {
 //////////////////////////////////////////////////////////////////////////////////
 #ifdef __linux__
 //funzione per il thread dedicato a gestire i segnali
-void* SigHandler(void* dummy) {
+/*void* SigHandler(void* dummy) {
   sigset_t sigset;
   sigemptyset(&sigset);
   sigaddset(&sigset, SIGHUP);
@@ -525,7 +526,7 @@ void* SigHandler(void* dummy) {
       break;
   }
   return NULL;
-}
+}*/
 #endif
 
 // Dopo che un thread viene creato esegue questa funzione
@@ -700,6 +701,10 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
       brkt = NULL;
       cmd = NULL;
       args = NULL;
+      if (strlen(command) == 0) {
+          // parametro di sicurezza per evitare seg fault
+          break;
+      }
 
       // alloco e duplico il comando ricevuto
       dup_cmd = (char*)Calloc(_commandLen, sizeof(char));
@@ -770,9 +775,9 @@ int LSF(SOCKET socket_descriptor, char* path) {
             il primo valore conterrebbe il size del file, esso è corrotto
         */
 #ifdef _WIN32
-        _bufferLen = vsnprintf(NULL, 0, "%llu %ls\r\n", size, file.c_str()) + 1;
+        _bufferLen = snprintf(NULL, 0, "%llu %ls\r\n", size, file.c_str()) + 1;
         buffer = (char*)Calloc(_bufferLen, sizeof(char));
-        vsprintf_s(buffer, _bufferLen, "%llu %ls\r\n", size, file.c_str());
+        sprintf_s(buffer, _bufferLen, "%llu %ls\r\n", size, file.c_str());
 #else
         _bufferLen = asprintf(&buffer, "%llu %s\r\n", size, &(file.c_str())[0])+1;
 #endif
@@ -1109,11 +1114,11 @@ int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
 
     FILE* _f;
 #ifdef _WIN32
-    fopen_s(&_f, path, "w");
+    fopen_s(&_f, path, "wb");
 #else
-    _f = fopen(path, "w");
+    _f = fopen(path, "wb");
 #endif
-    if (errno) {
+    if (_f == NULL) {
         ShowErr("Impossibile aprire file in DOWNLOAD");
     }
 
@@ -1267,30 +1272,8 @@ char* _exec(const char* cmd) {
 
 //////////////////////////////////////////////////////////////////////////////////
 
-// TODO: si può migliorare
-void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
-    if (soc <= 0) return;
-    if (str == NULL) return;
-
-    int point = 0;
-    char* buffer = (char*)Calloc(1024, sizeof(char));
-
-    for (int i = 0; i < bufferMaxLen; i += 1023) {
-        memset(buffer, '\0', 1024);
-
-        if (i + 1023 > bufferMaxLen) {
-            memcpy(buffer, str + i, bufferMaxLen - i);
-        }
-        else {
-            memcpy(buffer, str + i, 1023);
-        }
-
-        Send(soc, buffer, 1023);
-    }
-
-    Free(buffer, 1024);
-}
-
+// invia in blocco il buffer
+// da errore se il buffer è troppo grande
 void Send(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
 
     if (str == NULL) {
@@ -1305,6 +1288,31 @@ void Send(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
     }
 }
 
+// invia blocchi da 1024 
+void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
+    if (soc <= 0) return;
+    if (str == NULL) return;
+
+    int point = 0;
+    char* buffer = (char*)Calloc(1024, sizeof(char));
+
+    for (int i = 0; i < bufferMaxLen; i += 1024) {
+        memset(buffer, '\0', 1024);
+
+        if (i + 1024 > bufferMaxLen) {
+            memcpy(buffer, str + i, bufferMaxLen - i);
+        }
+        else {
+            memcpy(buffer, str + i, 1024);
+        }
+
+        Send(soc, buffer, 1024);
+    }
+
+    Free(buffer, 1024);
+}
+
+// riceve finchè non trova \0
 int Recv(SOCKET soc, char* _return, unsigned long long bufferMaxLen) {
     if (bufferMaxLen == 0) {
         return -1;
@@ -1343,6 +1351,7 @@ int Recv(SOCKET soc, char* _return, unsigned long long bufferMaxLen) {
     return max;
 }
 
+// riceve fino alla seguenza " \r\n.\r\n"
 int ReadAll(SOCKET soc, char*& ans) {
 
     if (ans != NULL) {
@@ -1386,6 +1395,7 @@ int ReadAll(SOCKET soc, char*& ans) {
     return len_ans;
 }
 
+// riceve fino a riempire il buffer
 int ReadMax(SOCKET soc, char*& ans, unsigned long long BufferMaxLen) {
 
     if (ans != NULL) {
@@ -1394,9 +1404,9 @@ int ReadMax(SOCKET soc, char*& ans, unsigned long long BufferMaxLen) {
 
     //char* buffer_recv = (char*)Calloc(128, sizeof(char));
     ans = (char*)Calloc(BufferMaxLen, sizeof(char));
-    int len_ans = 1, len = 0;
+    int len_ans = 1;
 
-    len_ans = recv(soc, ans, BufferMaxLen, 0);
+    len_ans = recv(soc, ans, BufferMaxLen, MSG_WAITALL);
 
     /*
     buffer lungo effettivamente 128, ma leggo solo 127 byte, l'ultimo sarà \0
