@@ -186,7 +186,7 @@ void parseConfig() {
             int i;
             int printTok,nthread,port = 0;
 
-            
+
             // il primo strtok prende il numero del config
             i = std::stoi(strtok_r(line, " ", &next_tok));
             // il secondo strtok ottiene il valore associato
@@ -319,9 +319,9 @@ void spawnSockets() {
     threadChild = (void**)Calloc(parametri.nthread, sizeof(HANDLE));
     #else
     threadChild = (pthread_t*)Calloc(parametri.nthread, sizeof(pthread_t));
+    pthread_mutex_init(&mutex, NULL);
+    pthread_cond_init(&cond_var, NULL);
     #endif
-
-
     // instanzio i thread nella lista
     for (int q = 0; q < parametri.nthread; q++) {
         #ifdef _WIN32
@@ -329,19 +329,16 @@ void spawnSockets() {
             ShowErr("Impossibile creare un thread");
         }
         #else // linux
-        pthread_mutex_init(&mutex, NULL);
-        pthread_cond_init(&cond_var, NULL);
         // TODO: ricordarsi di fare il destroy
         if (pthread_create(&threadChild[(long)q], NULL, Accept, (void*)T_s) != 0)
             printf("Failed to create thread\n");
         #endif
     }
-    
+
     #ifdef __linux__
     // spawno 1 thread che gestisce i segnali:
-    /*if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
+    if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
         printf("Failed to create signal handling thread\n");
-        */
     #endif
 
 
@@ -400,9 +397,9 @@ void beginServer() {
 #else // linux
         pthread_mutex_lock(&mutex);
         wake_one = false;
-        pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione        
+        pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
         pthread_mutex_unlock(&mutex);
-        
+
 #endif // _WIN32
 
     }
@@ -431,7 +428,7 @@ void clearSocket() {
 #endif
         closesocket(socketMaster);
     }
-    
+
 #ifdef _WIN32
     WSACleanup();
 #endif
@@ -514,7 +511,7 @@ void closeLog() {
 //////////////////////////////////////////////////////////////////////////////////
 #ifdef __linux__
 //funzione per il thread dedicato a gestire i segnali
-/*void* SigHandler(void* dummy) {
+void* SigHandler(void* dummy) {
   sigset_t sigset;
   sigemptyset(&sigset);
   sigaddset(&sigset, SIGHUP);
@@ -528,7 +525,7 @@ void closeLog() {
       break;
   }
   return NULL;
-}*/
+}
 #endif
 
 // Dopo che un thread viene creato esegue questa funzione
@@ -663,7 +660,7 @@ int Autenticazione(SOCKET socket_descriptor) {
         return 1;
     }
 
-    // enc1 
+    // enc1
     // T_s XOR nonce XOR T_c
     T_c = T_s ^ nonce ^ strtoul(strtok_r(NULL, " ;", &next_tok), &endP, 10);
 
@@ -858,7 +855,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                 ShowErr("Errore nell'allocare lista in EXEC comando copy");
             }
         }
-        
+
         // copy  || copy path1
         if (i < 2) {
             Send(socket_descriptor, "400", 4);
@@ -1211,7 +1208,7 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
 
     fclose(_f);
 
-    
+
     Send(socket_descriptor, "300", 4);
     Send(socket_descriptor, buffer, sizeI+1);
     Free(buffer);
@@ -1274,7 +1271,7 @@ char* _exec(const char* cmd) {
 void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
     if (soc <= 0) return;
     if (str == NULL) return;
-    
+
     int point = 0;
     char* buffer = (char*)Calloc(1024, sizeof(char));
 
@@ -1318,18 +1315,18 @@ int Recv(SOCKET soc, char* _return, unsigned long long bufferMaxLen) {
     int len = 0;
     int max = bufferMaxLen;
     char* moreBuf = NULL;
-    
+
     if ((len = recv(soc, _return, bufferMaxLen, 0)) <= 0) {
         //ShowErr("Errore nel ricevere un messaggio dal client");
         return -1;
     }
 
     if (_return[max - 1] != '\0') {
-        
+
         moreBuf = (char*)Calloc(bufferMaxLen, sizeof(char));
 
         while (_return[max - 1] != '\0') {
-            
+
             if ((len = recv(soc, moreBuf, bufferMaxLen, 0)) <= 0) {
                 //ShowErr("Errore nel ricevere un messaggio dal client");
                 return -1;
@@ -1403,7 +1400,7 @@ int ReadMax(SOCKET soc, char*& ans, unsigned long long BufferMaxLen) {
 
     /*
     buffer lungo effettivamente 128, ma leggo solo 127 byte, l'ultimo sarà \0
-    
+
     while ((len = recv(soc, buffer_recv, 127, 0)) > 0) { // buffer_recv avrà \0 alla fine
 
         if (len != strlen(buffer_recv)) {

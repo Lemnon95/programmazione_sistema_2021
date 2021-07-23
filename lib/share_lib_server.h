@@ -129,7 +129,7 @@ void closeLog();
 // thread function
 
 #ifdef __linux__
-//void* SigHandler(void* dummy);
+void* SigHandler(void* dummy);
 #endif
 
 void* Accept(void* rank);
