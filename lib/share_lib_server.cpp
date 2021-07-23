@@ -387,7 +387,7 @@ void beginServer() {
         // accept() crea un nuovo file-descriptor per ogni client in entrata
         addr_size = sizeof(socketChild);
         newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
-        printf ("Sono dopo accept \n");
+        printf ("Sono dopo accept - newSock:%d\n", newSocket);
         if (newSocket == -1) break;
         Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
 
@@ -395,14 +395,15 @@ void beginServer() {
         printf("\nConnessione in entrata\n");
 #endif // _DEBUG
 
-        #ifdef _WIN32
+#ifdef _WIN32
         WakeConditionVariable(&Threadwait);
-        #else // linux
+#else // linux
         pthread_mutex_lock(&mutex);
         wake_one = false;
-        pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
+        pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione        
         pthread_mutex_unlock(&mutex);
-        #endif // _WIN32
+        
+#endif // _WIN32
 
     }
 
@@ -560,8 +561,10 @@ void* Accept(void* rank) {
         #else //linux
         pthread_mutex_lock(&mutex);
         while (wake_one) {
-          pthread_cond_wait(&cond_var, &mutex);
-          printf("Sono fuori la wait, prima di if esci\n");
+          if(pthread_cond_wait(&cond_var, &mutex) != 0) {
+              printf("\nerr: %s\n", strerror(errno));
+          }
+          printf("Thread sveglio\n");
           if (esci) {
             chiusura++;
             pid_t x = syscall(__NR_gettid);
@@ -763,14 +766,19 @@ int LSF(SOCKET socket_descriptor, char* path) {
         unsigned long long size = std::filesystem::file_size(file, err);
         if (err.value() != 0) continue;
 
+        // NON rimpiazzare con il wrapper Asprintf
+        /*
+        BUG:
+            il primo valore di argptr quando viene eseguito -l . (lista dei file nella dir)
+            il primo valore conterrebbe il size del file, esso è corrotto
+        */
 #ifdef _WIN32
-        _bufferLen = Asprintf(buffer, "%llu %ls\r\n", size, file.c_str());
+        _bufferLen = vsnprintf(NULL, 0, "%llu %ls\r\n", size, file.c_str()) + 1;
+        buffer = (char*)Calloc(_bufferLen, sizeof(char));
+        vsprintf_s(buffer, _bufferLen, "%llu %ls\r\n", size, file.c_str());
 #else
-        _bufferLen = Asprintf(buffer, "%llu %s\r\n", size, &(file.c_str())[0]);
-#endif // _WIN32
-
-        
-
+        _bufferLen = asprintf(&buffer, "%llu %s\r\n", size, &(file.c_str())[0])+1;
+#endif
 
         if ((records = (char*)realloc(records, (_recordsLen + _bufferLen))) == NULL) {
             ShowErr("Impossibile allocare memoria per i file della funzione LSF");
@@ -1565,28 +1573,12 @@ int Asprintf(char*& buffer, const char* Format, ...) {
     va_list argptr;
     va_start(argptr, Format);
 
-    vprintf(Format, argptr);
-
-    
-
-    
-
 #ifdef _WIN32
     n = vsnprintf(NULL, 0, Format, argptr) + 1;
     buffer = (char*)Calloc(n, sizeof(char));
     vsprintf_s(buffer, n, Format, argptr);
 #else
-
-    /*
-    BUG:
-        il primo valore di argptr quando viene eseguito -l . (lista dei file nella dir)
-        il primo valore conterrebbe il size del file, esso è corrotto
-    
-    */
-
-
     n = vasprintf(&buffer, Format, argptr);
-    //vsnprintf(buffer, n, Format, argptr);
 #endif
 
     va_end(argptr);

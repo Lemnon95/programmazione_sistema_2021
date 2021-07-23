@@ -49,8 +49,8 @@ inline CRITICAL_SECTION FileLock;
 #include <pwd.h>
 
 //dichiarazione mutex e condition variables linux
-inline pthread_mutex_t mutex;
-inline pthread_cond_t cond_var;
+inline pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+inline pthread_cond_t cond_var = PTHREAD_COND_INITIALIZER;
 inline pthread_t* threadChild = NULL;
 inline pthread_t thread_handler;
 inline bool wake_one = true;
