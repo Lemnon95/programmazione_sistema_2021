@@ -703,7 +703,9 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
       args = NULL;
       if (strlen(command) == 0) {
           // parametro di sicurezza per evitare seg fault
+#ifdef _DEBUG
           printf("\n!err!\n");
+#endif
           break;
       }
 
@@ -1108,11 +1110,6 @@ int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
         Send(socket_descriptor, "400",4);
         return 1;
     }
-    unsigned long long sizeI = strtoull(size, &endP, 10);
-    Send(socket_descriptor, "300", 4);
-
-    _ansLen = ReadMax(socket_descriptor, ans, sizeI);
-
     FILE* _f;
 #ifdef _WIN32
     fopen_s(&_f, path, "wb");
@@ -1120,14 +1117,16 @@ int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
     _f = fopen(path, "wb");
 #endif
     if (_f == NULL) {
-        ShowErr("Impossibile aprire file in DOWNLOAD");
+        Send(socket_descriptor, "400", 4);
+        return 1;
     }
 
-    fwrite(ans, 1, _ansLen, _f);
+    unsigned long long sizeI = strtoull(size, &endP, 10);
+    Send(socket_descriptor, "300", 4);
+
+    RecvWriteF(socket_descriptor, _f, sizeI);
 
     fclose(_f);
-
-
 
     return 0;
 }
@@ -1439,6 +1438,35 @@ int ReadMax(SOCKET soc, char*& ans, unsigned long long BufferMaxLen) {
     */
 
     //Free(buffer_recv);
+
+    return len_ans;
+
+}
+
+// ricevo e scrivo su file
+int RecvWriteF(SOCKET soc, FILE* _f, unsigned long long BufferMaxLen) {
+    if (_f == NULL) {
+        ShowErr("passare un file aperto a RecvWriteF");
+    }
+
+    char* buffer_recv = (char*)Calloc(128, sizeof(char));
+    int len_ans = 1, len = 0;
+
+    // mentre ricevo dati dal socket, scrivo sul file
+    while ((len = recv(soc, buffer_recv, 128, 0)) > 0) { // buffer_recv avrà \0 alla fine
+
+        fwrite(buffer_recv, 1, len, _f);
+
+        // clean up
+        memset(buffer_recv, '\0', len);
+        len_ans += len;
+
+        if (len_ans + 1 >= BufferMaxLen) {
+            break;
+        }
+    }
+
+    Free(buffer_recv, 128);
 
     return len_ans;
 

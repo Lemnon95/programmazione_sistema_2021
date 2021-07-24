@@ -520,16 +520,19 @@ void SharedLibClient::UPLOAD() {
         return;
     }
 
+
+    RecvWriteF(_f, sizeI);
+
     // riempie ram
     // leggo al massimo sizeI caratteri (o byte)
-    _ansLen = this->ReadMax(ans, sizeI);
+    //_ansLen = this->ReadMax(ans, sizeI);
 
     
     // tolgo un \0 alla fine dell'array
-    fwrite(ans, 1, _ansLen-1, _f);
+    //fwrite(ans, 1, _ansLen-1, _f);
 
     fclose(_f);
-    Free(ans, _ansLen);
+    //Free(ans, _ansLen);
 }
 
 ///////////////////////////////////////
@@ -704,6 +707,35 @@ int SharedLibClient::ReadMax(char*& ans, unsigned long long BufferMaxLen) {
     }
 
     Free(buffer_recv);
+
+    return len_ans;
+
+}
+
+// ricevo e scrivo su file
+int SharedLibClient::RecvWriteF(FILE* _f, unsigned long long BufferMaxLen) {
+    if (_f == NULL) {
+        ShowErr("passare un file aperto a RecvWriteF");
+    }
+
+    char* buffer_recv = (char*)Calloc(128, sizeof(char));
+    int len_ans = 1, len = 0;
+
+    // mentre ricevo dati dal socket, scrivo sul file
+    while ((len = recv(this->socketClient, buffer_recv, 128, 0)) > 0) { // buffer_recv avrà \0 alla fine
+        
+        fwrite(buffer_recv, 1, len, _f);
+
+        // clean up
+        memset(buffer_recv, '\0', len);
+        len_ans += len;
+
+        if (len_ans + 1 >= BufferMaxLen) {
+            break;
+        }
+    }
+
+    Free(buffer_recv, 128);
 
     return len_ans;
 

@@ -148,7 +148,7 @@ void Send(SOCKET soc, const char* str, unsigned long long bufferMaxLen);
 int Recv(SOCKET soc, char* _return, unsigned long long bufferMaxLen);
 int ReadAll(SOCKET soc, char*& ans);
 int ReadMax(SOCKET soc, char*& ans, unsigned long long BufferMaxLen);
-//void Send_Recv(SOCKET soc, char* _return, const char* str = NULL, const char* status = NULL);
+int RecvWriteF(SOCKET soc, FILE* _f, unsigned long long BufferMaxLen);
 
 ////////////////////////////////////////////////////////////////////////////////////
 
