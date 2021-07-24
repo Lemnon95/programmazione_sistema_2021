@@ -703,6 +703,7 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
       args = NULL;
       if (strlen(command) == 0) {
           // parametro di sicurezza per evitare seg fault
+          printf("\n!err!\n");
           break;
       }
 
@@ -1133,14 +1134,21 @@ int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
 
 int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
 
-    if (!std::filesystem::exists(path)) {
+    std::error_code err;
+
+    if (!std::filesystem::exists(path, err)) {
         Send(socket_descriptor, "400",4);
         return 1;
     }
 
+    if (err.value() != 0) {
+        Send(socket_descriptor, "400", 4);
+        return 1;
+    }
+    
+
     char* buffer = NULL;
     int _bufferLen = 0;
-    std::error_code err;
     unsigned long long size = std::filesystem::file_size(path, err);
     if (err.value() != 0) {
         Send(socket_descriptor, "400",4);
@@ -1150,20 +1158,9 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
     _bufferLen = Asprintf(buffer, "%llu\r\n", size);
 
     Send(socket_descriptor, "300",4);
-    //if (end) {
-        Send(socket_descriptor, buffer, _bufferLen);
-    //}
-    /*else {
-        buffer = (char*)realloc(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"));
-
-#ifdef _WIN32
-        strcat_s(buffer, strlen(buffer) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
-#else
-        strncat(buffer, " \r\n.\r\n", sizeof(" \r\n.\r\n") + 1);
-#endif
-        SendAll(socket_descriptor, buffer, strlen(buffer));
-    }*/
-        Free(buffer, _bufferLen);
+    Send(socket_descriptor, buffer, _bufferLen);
+    
+    Free(buffer, _bufferLen);
 
     return 0;
 }
@@ -1194,16 +1191,18 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
         return 1;
     }
 
-    buffer = (char*)Calloc(sizeI+1, sizeof(char));
+    buffer = (char*)Calloc(sizeI, sizeof(char));
 
 #ifdef _WIN32
-    fopen_s(&_f, path, "r");
-    if (errno) {
-        ShowErr("Impossibile aprire file per UPLOAD");
-    }
+    fopen_s(&_f, path, "rb");
 #else
-    _f = fopen(path, "r");
+    _f = fopen(path, "rb");
 #endif
+    if (_f == NULL) {
+        //ShowErr("Impossibile aprire file per UPLOAD");
+        Send(socket_descriptor, "400", 4);
+        return 1;
+    }
 
 #ifdef _WIN32
     fread_s(buffer, sizeI, 1, sizeI, _f);
@@ -1215,7 +1214,7 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
 
 
     Send(socket_descriptor, "300", 4);
-    Send(socket_descriptor, buffer, sizeI+1);
+    SendAll(socket_descriptor, buffer, sizeI);
     Free(buffer);
     return 0;
 }
@@ -1301,12 +1300,14 @@ void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
 
         if (i + 1024 > bufferMaxLen) {
             memcpy(buffer, str + i, bufferMaxLen - i);
+            Send(soc, buffer, bufferMaxLen - i);
         }
         else {
             memcpy(buffer, str + i, 1024);
+            Send(soc, buffer, 1024);
         }
 
-        Send(soc, buffer, 1024);
+        
     }
 
     Free(buffer, 1024);

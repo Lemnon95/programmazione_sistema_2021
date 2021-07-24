@@ -422,7 +422,7 @@ void SharedLibClient::DOWLOAD() {
         return;
     }
 
-    char* buffer = (char*)Calloc(sizeI+1, sizeof(char));
+    char* buffer = (char*)Calloc(sizeI, sizeof(char));
 
     FILE* _f = NULL;
 
@@ -437,7 +437,7 @@ void SharedLibClient::DOWLOAD() {
 
     // può riempie ram
 #ifdef _WIN32
-    fread_s(buffer, sizeI+1, 1, sizeI, _f);
+    fread_s(buffer, sizeI, 1, sizeI, _f);
 #else
     fread(buffer, 1, sizeI, _f);
 #endif
@@ -455,6 +455,17 @@ void SharedLibClient::UPLOAD() {
         ShowErr("File destinazione già presente");
     }
     
+    FILE* _f;
+#ifdef _WIN32
+    fopen_s(&_f, this->parametri.upload.dest, "wb");
+#else
+    _f = fopen(this->parametri.upload.dest, "wb");
+#endif
+    if (_f == NULL) {
+        ShowErr("Impossibile aprire file in UPLOAD");
+    }
+
+
     char status[4] = {0};
 
     char* command = NULL;
@@ -481,7 +492,7 @@ void SharedLibClient::UPLOAD() {
     this->Recv(status, 4);
     if (strncmp(status, "300", 3) != 0) {
         Free(status, 4);
-        printf("Errore nell'esecuzione di SIZE\n");
+        printf("Errore da parte del server nell'eseguire SIZE\n");
         return;
     }
     
@@ -492,7 +503,9 @@ void SharedLibClient::UPLOAD() {
     // peso del file in fomrato integer
     sizeI = strtoull(size, &endP, 10);
     Free(size, _sizeLen);
-
+#ifdef _DEBUG
+    printf("size recv: %llu", sizeI);
+#endif
     ////////////////
 
     _commandLen = Asprintf(command, "UPLOAD %s;%llu", this->parametri.upload.src, sizeI);
@@ -507,24 +520,15 @@ void SharedLibClient::UPLOAD() {
         return;
     }
 
+    // riempie ram
     // leggo al massimo sizeI caratteri (o byte)
     _ansLen = this->ReadMax(ans, sizeI);
 
-    FILE* _f;
-#ifdef _WIN32
-    fopen_s(&_f, this->parametri.upload.dest, "w");
-#else
-    _f = fopen(this->parametri.upload.dest, "w");
-#endif
-    if (errno) {
-        ShowErr("Impossibile aprire file in DOWNLOAD");
-    }
-
-    fwrite(ans, 1, _ansLen, _f);
+    
+    // tolgo un \0 alla fine dell'array
+    fwrite(ans, 1, _ansLen-1, _f);
 
     fclose(_f);
-
-    //printf("\n%s\n", ans);
     Free(ans, _ansLen);
 }
 
@@ -562,13 +566,15 @@ void SharedLibClient::SendAll(const char* str, unsigned long long bufferMaxLen) 
         if (i + 1024 > bufferMaxLen) {
             // invia i rimanenti 
             memcpy(buffer, str + i, bufferMaxLen - i);
+            Send(buffer, bufferMaxLen - i);
         }
         else {
             // invia tutti i 1024
             memcpy(buffer, str + i, 1024);
+            Send(buffer, 1024);
         }
 
-        Send(buffer, 1024);
+        
     }
 
     Free(buffer, 1024);
