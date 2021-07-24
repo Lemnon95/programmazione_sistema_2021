@@ -153,9 +153,10 @@ void CloseServer() {
     #else
         // TODO: distruzione pthread lock
     #endif
-
-    if(FileDescLog != NULL)
-        closeLog();
+    if (signum == 2) {
+      if(FileDescLog != NULL)
+          closeLog();
+    }
 
     clearSocket();
 }
@@ -163,7 +164,7 @@ void CloseServer() {
 void parseConfig() {
 
     // se definito leggi il config
-    // sovrascrivi le impostazioni che sono defaut
+    // sovrascrivi le impostazioni che sono default
     if (parametri.configPath != NULL) {
         FILE* _tConf = NULL;
 
@@ -370,6 +371,7 @@ void beginServer() {
 
     socklen_t addr_size;
     SOCKET newSocket = 0;
+    bool uscita = false;
 
     openLog();
 
@@ -380,47 +382,60 @@ void beginServer() {
     #endif
 
     // Main Thread Loop
-    while (1) {
-        // accept() crea un nuovo file-descriptor per ogni client in entrata
-        addr_size = sizeof(socketChild);
-        newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
-        printf ("Sono dopo accept - newSock:%d\n", newSocket);
-        if (newSocket == -1) break;
-        Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
+    while (!uscita) {
+      while (1) {
+          // accept() crea un nuovo file-descriptor per ogni client in entrata
+          addr_size = sizeof(socketChild);
+          newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
+          printf ("Sono dopo accept - newSock:%d\n", newSocket);
+          if (newSocket == -1) break;
+          Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
 
-#ifdef _DEBUG
-        printf("\nConnessione in entrata\n");
-#endif // _DEBUG
+  #ifdef _DEBUG
+          printf("\nConnessione in entrata\n");
+  #endif // _DEBUG
 
-#ifdef _WIN32
-        WakeConditionVariable(&Threadwait);
-#else // linux
-        pthread_mutex_lock(&mutex);
-        wake_one = false;
-        pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
-        pthread_mutex_unlock(&mutex);
+  #ifdef _WIN32
+          WakeConditionVariable(&Threadwait);
+  #else // linux
+          pthread_mutex_lock(&mutex);
+          wake_one = false;
+          pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
+          pthread_mutex_unlock(&mutex);
 
-#endif // _WIN32
+  #endif // _WIN32
 
-    }
+      }
 
-#ifdef __linux__
-    // terminazione programma (sigint) o restart (sighup)
-    pthread_mutex_lock(&mutex);
-    esci = 1;
-    pthread_cond_broadcast(&cond_var);
-    pthread_mutex_unlock(&mutex);
-    for (long i = 0; i < parametri.nthread; i++) {
-      pthread_join(threadChild[i], NULL);
-    }
-#endif
+  #ifdef __linux__
+      // terminazione programma (sigint) o restart (sighup)
+      pthread_mutex_lock(&mutex);
+      esci = 1;
+      pthread_cond_broadcast(&cond_var);
+      pthread_mutex_unlock(&mutex);
+      for (long i = 0; i < parametri.nthread; i++) {
+        pthread_join(threadChild[i], NULL);
+      }
+      pthread_join(thread_handler, NULL);
+      pthread_mutex_destroy(&mutex);
+      pthread_cond_destroy(&cond_var);
+      if (signum == 2) {
+        uscita = true;
+      }
+      else {
+        printf("Riavvio del Server\n");
+        parseConfig();
+        spawnSockets();
+      }
 
+  #endif
+  }
 }
 
 void clearSocket() {
     // se instanziato, chiudi il socket
     if (socketMaster != 0) {
-        printf ("sto chiudento socketmaster\n");
+        printf ("sto chiudendo socketmaster\n");
 #ifdef _WIN32
         shutdown(socketMaster, SD_RECEIVE);
 #else
@@ -516,14 +531,10 @@ void* SigHandler(void* dummy) {
   sigemptyset(&sigset);
   sigaddset(&sigset, SIGHUP);
   sigaddset(&sigset, SIGINT);
-  while (1) {
-    printf("inside handler before\n");
-    signum = sigwaitinfo(&sigset, NULL);
-    printf("inside handler after, signum: %d\n", signum);
-    CloseServer();
-    if (signum == 2)
-      break;
-  }
+  printf("inside handler before\n");
+  signum = sigwaitinfo(&sigset, NULL);
+  printf("inside handler after, signum: %d\n", signum);
+  CloseServer();
   return NULL;
 }
 #endif
