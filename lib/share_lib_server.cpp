@@ -122,7 +122,11 @@ void SharedLibServer(int argc, char* argv[]) {
                 ShowErr("parametro -l incompleto");
             }
 
-            
+            // non si può controllare il file se esiste poichè deve essere creato
+            // controllo se la cartella parente al file esiste
+            if (!std::filesystem::exists(std::filesystem::path(argv[argc + 1]).parent_path())) {
+                ShowErr("Percorso inesistente per il file log");
+            }
 
             parametri.logPath = (char*)Calloc(strlen(argv[argc + 1]) + 1, sizeof(char));
             //parametri.logPath = argv[argc + 1];
@@ -202,8 +206,9 @@ void parseConfig() {
         bool printTok;
         unsigned short nthread = 0;
         unsigned short port = 0;
-
-        while (fscanf(_tConf, "%d %s\n", &i, configData, 1024) > 0) {
+        // legge per linea 
+        // \r non viene aggiunto a configData
+        while (fscanf(_tConf, "%d %s", &i, configData, 1024) > 0) {
 
             if (configData[0] == '\0') {
                 continue;
@@ -245,8 +250,14 @@ void parseConfig() {
                     }
                     break;
                 case 3:
+                    // non si può controllare il file se esiste poichè deve essere creato
+                    // controllo se la cartella parente al file esiste
+                    if (!std::filesystem::path(configData).parent_path().empty()) {
+                        if (!std::filesystem::exists(std::filesystem::path(configData).parent_path())) {
+                            ShowErr("Percorso inesistente per il file log");
+                        }
+                    }
                     Strcpy(parametri.logPath, strlen(configData) + 1, configData);
-                    //parametri.logPath = configData;
                     break;
                 default:
                     break;
