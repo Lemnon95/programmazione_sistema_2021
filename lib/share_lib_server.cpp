@@ -471,12 +471,12 @@ void openLog() {
         // se non è aperto
         // apri il file in modalità Append
         #ifdef _WIN32
-        fopen_s(&FileDescLog, (char*)(parametri.logPath), "a");
+        fopen_s(&FileDescLog, parametri.logPath, "a");
         #else
-        FileDescLog = fopen((char*)(parametri.logPath), "a");
+        FileDescLog = fopen(parametri.logPath, "a");
         #endif
         // se da errore
-        if (errno) {
+        if (FileDescLog == NULL) {
             ShowErr("errore nell'aprire il file");
         }
     }
@@ -495,7 +495,8 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
     struct tm timeinfo;
     char time_stamp[80];
     if (time(&rawtime) < 0) ShowErr("Impossibile ottenere il tempo della macchina");
-
+    
+    errno = 0;
     #ifdef _WIN32
     localtime_s(&timeinfo, &rawtime);
     if (errno) ShowErr("Impossibile convertire il tempo locale");
@@ -523,7 +524,6 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
 #else
     // TODO: pthread exit critical
 #endif
-
 
 }
 
