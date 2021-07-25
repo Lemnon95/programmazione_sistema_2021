@@ -571,7 +571,7 @@ void* Accept(void* rank) {
     srand(time(NULL));
 
     SOCKET socket_descriptor;
-    unsigned long int Tpid = 0;
+    size_t Tpid = 0;
     // ottendo il thread id
     #ifdef _WIN32
     Tpid = GetCurrentThreadId();
@@ -638,10 +638,10 @@ int Autenticazione(SOCKET socket_descriptor) {
     risposte ai comandi + log
     */
 
-    unsigned long int T_c = 0;
-    unsigned long int nonce = 0;
-    unsigned long int challenge = 0;
-    unsigned long int challenge_nonce = 0;
+    size_t T_c = 0;
+    size_t nonce = 0;
+    size_t challenge = 0;
+    size_t challenge_nonce = 0;
 
     char* endP = NULL;
     char* next_tok = NULL;
@@ -679,24 +679,33 @@ int Autenticazione(SOCKET socket_descriptor) {
     if ((_authLen = Recv(socket_descriptor, auth, 1024)) <= 0) {
         return 1;
     }
-    //authResponse = (char*)Calloc(_authLen, sizeof(char));
     ///////////////////////////////////////////////////////////////
 
     // passo 5 ////////////////////////////////////////////////////
     // AUTH
-    if (strncmp(strtok_r(auth, " ;", &next_tok), "AUTH", 4) != 0) {
+    size_t enc1, enc2;
+
+#ifdef _WIN32
+    if (sscanf_s(auth, "AUTH %lu;%lu", &enc1, &enc2) != 2) {
+        Send(socket_descriptor, "400", 4);
         closesocket(socket_descriptor);
         return 1;
     }
+#else
+    if (sscanf(auth, "AUTH %lu;%lu", &enc1, &enc2) != 2) {
+        Send(socket_descriptor, "400", 4);
+        closesocket(socket_descriptor);
+        return 1;
+    }
+#endif
 
     // enc1
     // T_s XOR nonce XOR T_c
-    T_c = T_s ^ nonce ^ strtoul(strtok_r(NULL, " ;", &next_tok), &endP, 10);
+    T_c = T_s ^ nonce ^ enc1;
 
     // enc2
     // T_c XOR nonce
-    challenge_nonce = T_c ^ strtoul(strtok_r(NULL, " ;", &next_tok), &endP, 10);
-
+    challenge_nonce = T_c ^ enc2;
 
     Free(auth, _authLen);
     if (challenge_nonce != nonce) {

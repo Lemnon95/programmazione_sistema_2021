@@ -89,8 +89,8 @@ parametri opzionali:
 -l <path file>		percorso di log (default /tmp/server.log)
 */
 typedef struct _params {
-	short unsigned int port; // 0 - 65535
-	short unsigned int nthread; //0 - 65535, non più di 65534 poichè saturerebbero le porte disponibili (65535-1 dove -1 è del server stesso)
+	unsigned short int port; // 0 - 65535
+	unsigned short int nthread; //0 - 65535, non più di 65534 poichè saturerebbero le porte disponibili (65535-1 dove -1 è del server stesso)
 	char* configPath; // stringa di lunghezza variabile
 	bool printToken; // indice booleano per indicare se printare o meno il token T_s
 	char* logPath; // stringa variabile del percoso dei log
