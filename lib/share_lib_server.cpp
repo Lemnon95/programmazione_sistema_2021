@@ -3,7 +3,7 @@
 // funzione init
 void SharedLibServer(int argc, char* argv[]) {
 
-    unsigned long long maxArg = argc;
+    int maxArg = argc;
     char* _path = (char*)Calloc(MAX_PATH + 1, sizeof(char));
 
     // trova il percorso temp
@@ -35,18 +35,15 @@ void SharedLibServer(int argc, char* argv[]) {
 
             if (argc + 1 >= maxArg) {
                 ShowErr("parametro -p incompleto");
-
             }
 
             if (argv[argc + 1][0] == '-') {
                 ShowErr("parametro -p incompleto");
-
             }
             // conversione stringa in unsigned short
-            parametri.port = (unsigned short)strtoul(argv[argc + 1], NULL, 0);
+            parametri.port = (unsigned short)strtoul(argv[argc + 1], NULL, 10);
             if (errno) {
                 ShowErr("il parametro di -p non risulta un numero");
-
             }
 
             if (parametri.port == 0) {
@@ -66,8 +63,8 @@ void SharedLibServer(int argc, char* argv[]) {
             if (argv[argc + 1][0] == '-') {
                 ShowErr("parametro -n incompleto");
             }
-
-            parametri.nthread = atoi(argv[argc + 1]);
+            
+            parametri.nthread = (unsigned short)strtoul(argv[argc + 1], NULL, 10);
             if (errno) {
                 ShowErr("il parametro di -n non risulta un numero");
             }
@@ -91,9 +88,21 @@ void SharedLibServer(int argc, char* argv[]) {
                 ShowErr("parametro -c incompleto");
             }
 
-            parametri.configPath = (char*)Calloc(sizeof(argv[argc + 1]) +1, sizeof(char));
-            parametri.configPath = argv[argc + 1];
+            std::error_code err;
 
+            if (std::filesystem::exists(argv[argc + 1], err) && 
+                !std::filesystem::is_directory(argv[argc + 1], err)) {
+
+                parametri.configPath = (char*)Calloc(strlen(argv[argc + 1]) + 1, sizeof(char));
+                //parametri.configPath = argv[argc + 1];
+                Strcpy(parametri.configPath, strlen(argv[argc + 1])+1, argv[argc + 1]);
+
+            }
+            
+            if (err.value() != 0) {
+                ShowErr("path config non valido");
+            }
+            
         }
 
         // -s
@@ -113,9 +122,11 @@ void SharedLibServer(int argc, char* argv[]) {
                 ShowErr("parametro -l incompleto");
             }
 
-            parametri.logPath = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
-            parametri.logPath = argv[argc + 1];
+            
 
+            parametri.logPath = (char*)Calloc(strlen(argv[argc + 1]) + 1, sizeof(char));
+            //parametri.logPath = argv[argc + 1];
+            Strcpy(parametri.logPath, strlen(argv[argc + 1])+1, argv[argc + 1]);
         }
 
     }
@@ -172,27 +183,29 @@ void parseConfig() {
         #else // linux
         _tConf = fopen(parametri.configPath, "r");
         #endif
-        if (errno) { // errno viene settato anche con la fopen, come richiesto da POSIX
-            ShowErr("impossibile aprire (o inesistente) file config");
+        if (_tConf == NULL) {
+            //ShowErr("impossibile aprire file config");
+            return;
         }
 
-        char line[1024];
 
         // gestione config
-        while (fgets(line, 1024, _tConf)) {
+        /*
+        \r\n windows
+        \n UNIX (linux e mac os)
+        \r old mac os (non più usato)
+        */
 
-            char* next_tok = NULL;
-            char* configData = NULL;
-            int i;
-            int printTok,nthread,port = 0;
+        char configData[1024] = {0};
+        int i = -1;
 
+        bool printTok;
+        unsigned short nthread = 0;
+        unsigned short port = 0;
 
-            // il primo strtok prende il numero del config
-            i = std::stoi(strtok_r(line, " ", &next_tok));
-            // il secondo strtok ottiene il valore associato
-            configData = strtok_r(NULL, " ", &next_tok);
+        while (fscanf(_tConf, "%d %s\n", &i, configData, 1024) > 0) {
 
-            if (configData == NULL) {
+            if (configData[0] == '\0') {
                 continue;
             }
 
@@ -200,9 +213,15 @@ void parseConfig() {
             // nello shwitch associo un numero al rispettivo valore
             // di parametri
             // non è ammessa la modifica del configPath (dato in input)
+            /*
+            0 porta
+            1 nthread
+            2 print token T_s
+            3 log path
+            */
             switch (i) 	{
                 case 0:
-                    port = std::stoi(configData);
+                    port = (unsigned short)std::stoul(configData);
                     if (port > 0 && port < 65536) {
                         parametri.port = port;
                     }
@@ -211,7 +230,7 @@ void parseConfig() {
                     }
                     break;
                 case 1:
-                    nthread = std::stoi(configData);
+                    nthread = (unsigned short)std::stoul(configData);
                     if (nthread > 0 && nthread < 65536) {
                         parametri.nthread = nthread;
                     }
@@ -226,17 +245,14 @@ void parseConfig() {
                     }
                     break;
                 case 3:
-                    parametri.logPath = configData;
-
+                    Strcpy(parametri.logPath, strlen(configData) + 1, configData);
+                    //parametri.logPath = configData;
                     break;
                 default:
                     break;
             }
-
-
         }
         fclose(_tConf);
-
     }
 
 }
@@ -275,6 +291,7 @@ unsigned long int generateToken() {
 }
 
 unsigned long int hashToken(char* token) {
+    //TODO: migliorare
 
     unsigned long int k = 5381;
     // hashing
@@ -853,9 +870,8 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         // ottengo i parametri del comando copy e li metto nella variabile list
         while ((_t = strtok_r(NULL, " ", &fin)) != NULL) {
 
-            if ((list[i] = (char*)Calloc(strlen(_t) + 1, sizeof(char))) == NULL) {
-                ShowErr("Impossibile allocare memoria");
-            }
+            list[i] = (char*)Calloc(strlen(_t) + 1, sizeof(char));
+            
             Strcpy(list[i], strlen(_t)+1, _t);
             i++;
             list = (char**)realloc(list, (i+1)* sizeof(char**));
@@ -866,12 +882,20 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
         // copy  || copy path1
         if (i < 2) {
+            for (int k = 0; k < i; k++) {
+                Free(list[k]);
+            }
+            Free(list);
             Send(socket_descriptor, "400", 4);
             return 1;
         }
 
         // copy path1 path2 path3
         if (i > 2 && !std::filesystem::is_directory(list[i-1])) {
+            for (int k = 0; k < i; k++) {
+                Free(list[k]);
+            }
+            Free(list);
             Send(socket_descriptor, "400", 4);
             return 1;
         }
@@ -897,7 +921,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                 }
 
                 _resultLen += _bufferLen;
-
+                errno = 0;
                 #ifdef _WIN32
                 strcat_s(result, _resultLen, buffer);
                 #else
@@ -963,6 +987,8 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         for (int k = 0; k < i; k++) {
             if (std::filesystem::exists(list[k])) {
                 if (!std::filesystem::remove(list[k])) {
+                    Free(list[k]);
+                    Free(list);
                     Send(socket_descriptor, "400",4);
                     return 1;
                 }
@@ -973,14 +999,15 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                     ShowErr("Impossibile allocare memoria per i file della funzione LSF");
                 }
 
+                errno = 0;
                 #ifdef _WIN32
                 strcat_s(result, strlen(result) + n, buffer);
-                if (errno) {
-                    ShowErr("Errore in strcat dentro EXEC");
-                }
                 #else
                 strcat(result, buffer);
                 #endif
+                if (errno) {
+                    ShowErr("Errore in strcat dentro EXEC");
+                }
 
                 Free(buffer, strlen(buffer));
                 Free(list[k], strlen(list[k]));
@@ -989,6 +1016,10 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         }
 
         result = (char*)realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
+        if (result == NULL) {
+            ShowErr("Impossibile riallocare memoria dentro EXEC remove");
+        }
+
 
 #ifdef _WIN32
         strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
@@ -1008,19 +1039,26 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         unsigned long size = UNLEN + 1;
         result = (char*)Calloc(size, sizeof(char));
         if (!GetUserNameA(result, &size)) {
-            ShowErr("Impossibile ottenere l'username di whoami");
+            //ShowErr("Impossibile ottenere l'username di whoami");
+            Send(socket_descriptor, "400", 4);
+            return 1;
         }
 #else
         result = (char*)Calloc(257, sizeof(char));
         passwd* user = getpwuid(getuid());
         if(user == NULL) {
-            ShowErr("Impossibile ottenere l'username di whoami");
+            //ShowErr("Impossibile ottenere l'username di whoami");
+            Send(socket_descriptor, "400", 4);
+            return 1;
         }
         strcat(result, user->pw_name);
 #endif
 
 
         result = (char*)realloc(result, strlen(result) + sizeof("\r\n \r\n.\r\n"));
+        if (result == NULL) {
+            ShowErr("Impossibile allocare memoria in EXEC whoami");
+        }
 
 #ifdef _WIN32
         strcat_s(result, strlen(result) + sizeof("\r\n \r\n.\r\n"), "\r\n \r\n.\r\n");
@@ -1031,16 +1069,24 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result, strlen(result));
 
-
+        Free(result);
     }
 
     // printworkdir
     if (strcmp(command, "printworkdir") == 0) {
 
-        int _resultLen = Asprintf(result, "%s\r\n", std::filesystem::current_path().c_str());
+        std::error_code err;
 
+        int _resultLen = Asprintf(result, "%s\r\n", std::filesystem::current_path(err).c_str());
+        if (err.value() != 0) {
+            Send(socket_descriptor, "400", 4);
+            return 1;
+        }
 
         result = (char*)realloc(result, _resultLen + sizeof(" \r\n.\r\n"));
+        if (result == NULL) {
+            ShowErr("Impossibile reallocare memoria EXEC printworkdir");
+        }
 
         #ifdef _WIN32
         strcat_s(result, _resultLen + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
@@ -1052,6 +1098,8 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
         Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result, _resultLen);
+
+        Free(result, _resultLen);
     }
 
     // sort
@@ -1538,14 +1586,14 @@ bool _endingSequence(char* buffer, unsigned long long size) {
 // Wrapper
 
 // calloc Wrapper
-void* Calloc(unsigned long int count, unsigned long int size) {
+void* Calloc(size_t count, size_t size) {
 
     if (count == 0 || size == 0) {
         ShowErr("Uno dei due numeri del Calloc è impostato a 0");
     }
 
     void* _t = calloc(count, size);
-    if (_t == 0) {
+    if (_t == NULL) {
         ShowErr("Impossibile allocare memoria");
     }
 
@@ -1554,15 +1602,21 @@ void* Calloc(unsigned long int count, unsigned long int size) {
 
 // fprintf Wrapper
 void ShowErr(const char* str) {
-    char t[1024] = {0};
-    #ifdef _WIN32
+    char t[1024] = { 0 };
+    if (errno != 0) {
+#ifdef _WIN32
         strerror_s(t, 1023, errno);
-    #else
+#else
         strerror_r(errno, t, 1023);
-    #endif
+#endif
 
-    printf("\n%s\n", t);
+        printf("\n%s\n", t);
+    }
     fprintf(stderr, "%s\n", str);
+
+#ifdef _DEBUG
+    getchar();
+#endif // _DEBUG
     exit(1);
     return;
 
@@ -1585,7 +1639,7 @@ void Free(void* arg, int size) {
 }
 
 // strcpy Wrapper
-void Strcpy(char* dest, unsigned int size, const char* src) {
+void Strcpy(char* dest, size_t size, const char* src) {
     memset(dest, '\0', size);
 #ifdef _WIN32
     strcpy_s(dest, size, src);

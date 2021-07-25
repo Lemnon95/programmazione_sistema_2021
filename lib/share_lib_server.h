@@ -31,6 +31,7 @@
 #define strtok_r strtok_s
 #define popen _popen
 #define pclose _pclose
+#define fscanf fscanf_s
 
 // win32 condition variable
 inline CONDITION_VARIABLE Threadwait;
@@ -162,12 +163,12 @@ bool _endingSequence(char* buffer, unsigned long long size);
 ////////////////////////////////////////////////////////////////////////////////////
 
 // calloc Wrapper
-void* Calloc(unsigned long int nmemb, unsigned long int size);
+void* Calloc(size_t nmemb, size_t size);
 // fprintf Wrapper
 void ShowErr(const char* str);
 // free Wrapper
 void Free(void * arg, int size=0);
 // strcpy Wrapper
-void Strcpy(char* dest, unsigned int size, const char* src);
+void Strcpy(char* dest, size_t size, const char* src);
 // asprintf Wrapper
 int Asprintf(char*& buffer, const char* Format, ...);
