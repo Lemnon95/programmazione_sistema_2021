@@ -441,6 +441,7 @@ void beginServer() {
       for (long i = 0; i < parametri.nthread; i++) {
         pthread_join(threadChild[i], NULL);
       }
+      Free(threadChild);
       pthread_join(thread_handler, NULL);
       pthread_mutex_destroy(&mutex);
       pthread_cond_destroy(&cond_var);
@@ -449,6 +450,7 @@ void beginServer() {
       }
       else {
         printf("Riavvio del Server\n");
+        esci = 0;
         parseConfig();
         spawnSockets();
       }

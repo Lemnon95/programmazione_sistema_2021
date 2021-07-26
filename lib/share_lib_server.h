@@ -38,6 +38,8 @@ inline CONDITION_VARIABLE Threadwait;
 inline CRITICAL_SECTION CritSec;
 inline CRITICAL_SECTION FileLock;
 
+inline int esci = 0;
+inline int signum=2;
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>
