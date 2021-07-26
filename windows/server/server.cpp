@@ -6,20 +6,28 @@
 
 
 int main(int argc, char* argv[]) {
-  #ifdef __linux__
+#ifdef __linux__
   sigset_t sigset;
   sigemptyset(&sigset);
   sigaddset(&sigset, SIGINT);
   sigaddset(&sigset, SIGHUP);
   if((sigprocmask(SIG_BLOCK, &sigset, nullptr)== -1))
     printf("Failure sigprocmask");
-  #endif
+#else //_WIN32
+    if (!SetConsoleCtrlHandler(CtrlHandler, TRUE)) { //tutte le funzioni ctrl sono gestite
+        ShowErr("Impossibile creare handler ctrl");
+    }
+#endif
     // parser input
     SharedLibServer(argc, argv);
 
 
     // genera token
     getToken_s();
+
+#if __linux__
+    daemon(1, 0);
+#endif
 
     // crea threads
     spawnSockets();

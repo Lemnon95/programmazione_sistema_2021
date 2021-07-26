@@ -329,8 +329,6 @@ void spawnSockets() {
         ShowErr("impossibile avviare WinSock");
     }
 
-    InitializeConditionVariable(&Threadwait);
-    InitializeCriticalSection(&CritSec);
     #endif
 
     /*
@@ -345,7 +343,9 @@ void spawnSockets() {
 
     // crea figli
     #ifdef _WIN32
-    threadChild = (void**)Calloc(parametri.nthread, sizeof(HANDLE));
+    threadChild = (HANDLE*)Calloc(parametri.nthread, sizeof(HANDLE));
+    InitializeConditionVariable(&Threadwait);
+    InitializeCriticalSection(&CritSec);
     #else
     threadChild = (pthread_t*)Calloc(parametri.nthread, sizeof(pthread_t));
     pthread_mutex_init(&mutex, NULL);
@@ -427,7 +427,6 @@ void beginServer() {
           wake_one = false;
           pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
           pthread_mutex_unlock(&mutex);
-
   #endif // _WIN32
 
       }
@@ -441,10 +440,21 @@ void beginServer() {
       for (long i = 0; i < parametri.nthread; i++) {
         pthread_join(threadChild[i], NULL);
       }
-      Free(threadChild);
       pthread_join(thread_handler, NULL);
       pthread_mutex_destroy(&mutex);
       pthread_cond_destroy(&cond_var);
+#else // _WIN32
+      EnterCriticalSection(&CritSec);
+      esci = 1;
+      WakeAllConditionVariable(&Threadwait);
+      LeaveCriticalSection(&CritSec);
+      // thread join
+      WaitForMultipleObjects(parametri.nthread, threadChild, TRUE, INFINITE);
+
+      // no destroy per conditionvariable e criticalsection
+
+#endif
+      Free(threadChild);
       if (signum == 2) {
         uscita = true;
       }
@@ -454,14 +464,17 @@ void beginServer() {
         parseConfig();
         spawnSockets();
       }
-  #endif
   }
 }
 
 void clearSocket() {
     // se instanziato, chiudi il socket
     if (socketMaster != 0) {
-        printf ("sto chiudendo socketmaster\n");
+#ifdef _DEBUG
+        printf("sto chiudendo socketmaster\n");
+#endif // _DEBUG
+
+        
 #ifdef _WIN32
         shutdown(socketMaster, SD_RECEIVE);
 #else
@@ -550,18 +563,40 @@ void closeLog() {
 }
 
 //////////////////////////////////////////////////////////////////////////////////
-#ifdef __linux__
+
 //funzione per il thread dedicato a gestire i segnali
+#ifdef __linux__
 void* SigHandler(void* dummy) {
   sigset_t sigset;
   sigemptyset(&sigset);
   sigaddset(&sigset, SIGHUP);
   sigaddset(&sigset, SIGINT);
+#ifdef _DEBUG
   printf("inside handler before\n");
+#endif
   signum = sigwaitinfo(&sigset, NULL);
+#ifdef _DEBUG
   printf("inside handler after, signum: %d\n", signum);
+#endif 
   CloseServer();
   return NULL;
+}
+#else
+BOOL WINAPI CtrlHandler(DWORD signal) {
+
+    switch (signal) {
+    case CTRL_CLOSE_EVENT:
+    case CTRL_LOGOFF_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+    case CTRL_C_EVENT:
+        signum = 2;
+        CloseServer();
+        return TRUE;
+    default:
+        break;
+    }
+
+    return FALSE;
 }
 #endif
 
@@ -584,17 +619,22 @@ void* Accept(void* rank) {
         #ifdef _WIN32
         EnterCriticalSection(&CritSec);
         SleepConditionVariableCS(&Threadwait, &CritSec, INFINITE);
+        if (esci) {
+            LeaveCriticalSection(&CritSec);
+            return NULL;
+        }
         #else //linux
         pthread_mutex_lock(&mutex);
         while (wake_one) {
           if(pthread_cond_wait(&cond_var, &mutex) != 0) {
               printf("\nerr: %s\n", strerror(errno));
           }
-          printf("Thread sveglio\n");
           if (esci) {
             chiusura++;
+#ifdef _DEBUG
             pid_t x = syscall(__NR_gettid);
             printf("Exit Thread number: %d\n", x);
+#endif // _DEBUG
             pthread_mutex_unlock(&mutex);
             return NULL;
           }
@@ -619,6 +659,7 @@ void* Accept(void* rank) {
 
         closesocket(socket_descriptor);
     }
+    // TODO: eliminare?
 #ifdef __linux__
     chiusura++;
     pid_t x = syscall(__NR_gettid);

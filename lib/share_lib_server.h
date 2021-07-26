@@ -38,8 +38,9 @@ inline CONDITION_VARIABLE Threadwait;
 inline CRITICAL_SECTION CritSec;
 inline CRITICAL_SECTION FileLock;
 
+inline HANDLE* threadChild = NULL;
 inline int esci = 0;
-inline int signum=2;
+inline int signum=0;
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -104,9 +105,6 @@ inline params parametri;
 inline unsigned long int T_s = 0;
 inline FILE* FileDescLog = NULL;
 inline SOCKET socketMaster = 0;
-#ifdef _WIN32
-inline void** threadChild = NULL;
-#endif //WIN32
 inline sockaddr_storage socketChild;
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -134,6 +132,8 @@ void closeLog();
 
 #ifdef __linux__
 void* SigHandler(void* dummy);
+#else // _WIN32
+BOOL WINAPI CtrlHandler(DWORD signal);
 #endif
 
 void* Accept(void* rank);
