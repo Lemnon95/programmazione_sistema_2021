@@ -63,7 +63,7 @@ void SharedLibServer(int argc, char* argv[]) {
             if (argv[argc + 1][0] == '-') {
                 ShowErr("parametro -n incompleto");
             }
-            
+
             parametri.nthread = (unsigned short)strtoul(argv[argc + 1], NULL, 10);
             if (errno) {
                 ShowErr("il parametro di -n non risulta un numero");
@@ -90,7 +90,7 @@ void SharedLibServer(int argc, char* argv[]) {
 
             std::error_code err;
 
-            if (std::filesystem::exists(argv[argc + 1], err) && 
+            if (std::filesystem::exists(argv[argc + 1], err) &&
                 !std::filesystem::is_directory(argv[argc + 1], err)) {
 
                 parametri.configPath = (char*)Calloc(strlen(argv[argc + 1]) + 1, sizeof(char));
@@ -98,11 +98,11 @@ void SharedLibServer(int argc, char* argv[]) {
                 Strcpy(parametri.configPath, strlen(argv[argc + 1])+1, argv[argc + 1]);
 
             }
-            
+
             if (err.value() != 0) {
                 ShowErr("path config non valido");
             }
-            
+
         }
 
         // -s
@@ -207,9 +207,9 @@ void parseConfig() {
         int printTok;
         unsigned short nthread = 0;
         unsigned short port = 0;
-        // legge per linea 
+        // legge per linea
         // \r non viene aggiunto a configData
-        while (fscanf(_tConf, "%d %s", &i, configData, 1024) > 0) {
+        while (fscanf(_tConf, "%d %s", &i, configData) > 0) {
 
             if (configData[0] == '\0') {
                 continue;
@@ -365,7 +365,7 @@ void spawnSockets() {
 
     #ifdef __linux__
     // spawno 1 thread che gestisce i segnali:
-    /*if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
+    if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
         printf("Failed to create signal handling thread\n");
     //inizializzazione mutex per file di log
     pthread_mutex_init(&mutex_log, NULL);
@@ -505,7 +505,7 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
     struct tm timeinfo;
     char time_stamp[80];
     if (time(&rawtime) < 0) ShowErr("Impossibile ottenere il tempo della macchina");
-    
+
     errno = 0;
     #ifdef _WIN32
     localtime_s(&timeinfo, &rawtime);
@@ -550,7 +550,7 @@ void closeLog() {
 //////////////////////////////////////////////////////////////////////////////////
 #ifdef __linux__
 //funzione per il thread dedicato a gestire i segnali
-/*void* SigHandler(void* dummy) {
+void* SigHandler(void* dummy) {
   sigset_t sigset;
   sigemptyset(&sigset);
   sigaddset(&sigset, SIGHUP);
@@ -560,7 +560,7 @@ void closeLog() {
   printf("inside handler after, signum: %d\n", signum);
   CloseServer();
   return NULL;
-}*/
+}
 #endif
 
 // Dopo che un thread viene creato esegue questa funzione
@@ -782,7 +782,7 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
       // altri comandi
 
       memset(command, '\0', _commandLen);
-      
+
       if ((command = (char*)realloc(command, 1024)) == NULL) {
           ShowErr("Impossibile riallocare memoria");
       }
@@ -897,7 +897,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         while ((_t = strtok_r(NULL, " ", &fin)) != NULL) {
 
             list[i] = (char*)Calloc(strlen(_t) + 1, sizeof(char));
-            
+
             Strcpy(list[i], strlen(_t)+1, _t);
             i++;
             list = (char**)realloc(list, (i+1)* sizeof(char**));
@@ -1111,7 +1111,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             return 1;
         }
 
-        
+
         if ((result = (char*)realloc(result, _resultLen + sizeof(" \r\n.\r\n"))) == NULL) {
             ShowErr("Impossibile reallocare memoria EXEC printworkdir");
         }
@@ -1218,7 +1218,7 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
         Send(socket_descriptor, "400", 4);
         return 1;
     }
-    
+
 
     char* buffer = NULL;
     int _bufferLen = 0;
@@ -1232,7 +1232,7 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
 
     Send(socket_descriptor, "300",4);
     Send(socket_descriptor, buffer, _bufferLen);
-    
+
     Free(buffer, _bufferLen);
 
     return 0;
@@ -1360,7 +1360,7 @@ void Send(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
     }
 }
 
-// invia blocchi da 1024 
+// invia blocchi da 1024
 void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
     if (soc <= 0) return;
     if (str == NULL) return;
@@ -1379,7 +1379,7 @@ void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
             Send(soc, buffer, 1024);
         }
 
-        
+
     }
 
     Free(buffer, 1024);
