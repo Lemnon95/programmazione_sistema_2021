@@ -203,7 +203,7 @@ void parseConfig() {
         char configData[1024] = {0};
         int i = -1;
 
-        bool printTok;
+        int printTok;
         unsigned short nthread = 0;
         unsigned short port = 0;
         // legge per linea 
@@ -413,7 +413,7 @@ void beginServer() {
         // accept() crea un nuovo file-descriptor per ogni client in entrata
         addr_size = sizeof(socketChild);
         newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
-        printf ("Sono dopo accept - newSock:%d\n", newSocket);
+        printf ("Sono dopo accept - newSock:%llu\n", newSocket);
         if (newSocket == -1) break;
         Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
 
@@ -617,6 +617,7 @@ void* Accept(void* rank) {
 
         GestioneComandi(socket_descriptor, Tpid);
 
+        closesocket(socket_descriptor);
     }
 #ifdef __linux__
     chiusura++;
@@ -643,8 +644,6 @@ int Autenticazione(SOCKET socket_descriptor) {
     size_t challenge = 0;
     size_t challenge_nonce = 0;
 
-    char* endP = NULL;
-    char* next_tok = NULL;
 
     char helo[5] = { 0 }; // ricevo HELO
 
@@ -654,7 +653,6 @@ int Autenticazione(SOCKET socket_descriptor) {
     char* auth = (char*)Calloc(1024, sizeof(char));
     int _authLen = 0;
 
-    char* authResponse = NULL;
 
     // passo 1 ////////////////////////////////////////////////////
     Recv(socket_descriptor, helo, 5); // ricevo HELO
@@ -677,6 +675,7 @@ int Autenticazione(SOCKET socket_descriptor) {
 
     // passo 4 ////////////////////////////////////////////////////
     if ((_authLen = Recv(socket_descriptor, auth, 1024)) <= 0) {
+        closesocket(socket_descriptor);
         return 1;
     }
     ///////////////////////////////////////////////////////////////
@@ -686,7 +685,7 @@ int Autenticazione(SOCKET socket_descriptor) {
     size_t enc1, enc2;
 
 #ifdef _WIN32
-    if (sscanf_s(auth, "AUTH %lu;%lu", &enc1, &enc2) != 2) {
+    if (sscanf_s(auth, "AUTH %llu;%llu", &enc1, &enc2) != 2) {
         Send(socket_descriptor, "400", 4);
         closesocket(socket_descriptor);
         return 1;
@@ -732,12 +731,10 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
   char* dup_cmd = NULL;
   char* brkt = NULL;
   char* cmd = NULL;
-  char* args = NULL;
 
   while ((_commandLen = Recv(socket_descriptor, command, _commandLen)) > 0) {
       brkt = NULL;
       cmd = NULL;
-      args = NULL;
       if (strlen(command) == 0) {
           // parametro di sicurezza per evitare seg fault
 #ifdef _DEBUG
@@ -779,7 +776,10 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
       // altri comandi
 
       memset(command, '\0', _commandLen);
-      command = (char*)realloc(command, 1024);
+      
+      if ((command = (char*)realloc(command, 1024)) == NULL) {
+          ShowErr("Impossibile riallocare memoria");
+      }
       Free(dup_cmd, _commandLen);
   }
 
@@ -958,7 +958,9 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
         _resultLen += sizeof(" \r\n.\r\n");
 
-        result = (char*)realloc(result, _resultLen);
+        if ((result = (char*)realloc(result, _resultLen)) == NULL) {
+            ShowErr("Impossibile allocare memoria");
+        }
 
         #ifdef _WIN32
         strcat_s(result, _resultLen, " \r\n.\r\n");
@@ -976,7 +978,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
     // remove
     if (strcmp(command, "remove") == 0) {
-        int i = 0, n = 0;
+        int i = 0;
         char* _t = NULL, *buffer = NULL;
         char** list = (char**)Calloc(1, sizeof(char*)); // lista di stringhe
         result = (char*)Calloc(1, sizeof(char));
@@ -1015,13 +1017,13 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
                 int _bufferLen = Asprintf(buffer, "%s\r\n", list[k]);
 
-                if ((result = (char*)realloc(result, (strlen(result) + n))) == NULL) {
+                if ((result = (char*)realloc(result, (strlen(result) + _bufferLen))) == NULL) {
                     ShowErr("Impossibile allocare memoria per i file della funzione LSF");
                 }
 
                 errno = 0;
                 #ifdef _WIN32
-                strcat_s(result, strlen(result) + n, buffer);
+                strcat_s(result, strlen(result) + _bufferLen, buffer);
                 #else
                 strcat(result, buffer);
                 #endif
@@ -1029,7 +1031,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                     ShowErr("Errore in strcat dentro EXEC");
                 }
 
-                Free(buffer, strlen(buffer));
+                Free(buffer, _bufferLen);
                 Free(list[k], strlen(list[k]));
 
             }
@@ -1103,8 +1105,8 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             return 1;
         }
 
-        result = (char*)realloc(result, _resultLen + sizeof(" \r\n.\r\n"));
-        if (result == NULL) {
+        
+        if ((result = (char*)realloc(result, _resultLen + sizeof(" \r\n.\r\n"))) == NULL) {
             ShowErr("Impossibile reallocare memoria EXEC printworkdir");
         }
 
@@ -1163,8 +1165,6 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
     char* path = NULL, * size = NULL, *Pend = NULL;
     char* endP = NULL;
-    char* ans = NULL;
-    int _ansLen = 0;
 
     if ((path = strtok_r(cmd, ";", &Pend)) == NULL) {
         Send(socket_descriptor, "400",4);
@@ -1359,7 +1359,6 @@ void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
     if (soc <= 0) return;
     if (str == NULL) return;
 
-    int point = 0;
     char* buffer = (char*)Calloc(1024, sizeof(char));
 
     for (int i = 0; i < bufferMaxLen; i += 1024) {
@@ -1643,7 +1642,7 @@ void ShowErr(const char* str) {
 }
 
 // free Wrapper
-void Free(void* arg, int size) {
+void Free(void* arg, size_t size) {
 
     if (arg == NULL) {
         ShowErr("variabile data a Free() è NULL");

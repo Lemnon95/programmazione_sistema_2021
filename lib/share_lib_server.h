@@ -167,7 +167,7 @@ void* Calloc(size_t nmemb, size_t size);
 // fprintf Wrapper
 void ShowErr(const char* str);
 // free Wrapper
-void Free(void * arg, int size=0);
+void Free(void * arg, size_t size=0);
 // strcpy Wrapper
 void Strcpy(char* dest, size_t size, const char* src);
 // asprintf Wrapper

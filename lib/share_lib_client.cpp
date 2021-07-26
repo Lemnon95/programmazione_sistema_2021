@@ -481,8 +481,6 @@ void SharedLibClient::UPLOAD() {
 
     unsigned long long sizeI;
 
-    char* ans = NULL;
-    int _ansLen = 0;
 
     // Invio SIZE per sapere la dimensione del file
     _sizeCmdLen = Asprintf(sizeCmd, "SIZE %s", this->parametri.upload.src);
@@ -558,7 +556,6 @@ void SharedLibClient::SendAll(const char* str, unsigned long long bufferMaxLen) 
     if (this->socketClient <= 0) return;
     if (str == NULL) return;
 
-    int point = 0;
     char* buffer = (char*)Calloc(1024, sizeof(char));
 
     // itero sulla size del buffer
