@@ -166,11 +166,12 @@ void CloseServer() {
     #ifdef _WIN32
     DeleteCriticalSection(&FileLock);
     #else
-        // TODO: distruzione pthread lock
+    pthread_mutex_destroy(&mutex_log);
     #endif
-
-    if(FileDescLog != NULL)
-        closeLog();
+    if (signum == 2) {
+      if(FileDescLog != NULL)
+          closeLog();
+    }
 
     clearSocket();
 }
@@ -178,7 +179,7 @@ void CloseServer() {
 void parseConfig() {
 
     // se definito leggi il config
-    // sovrascrivi le impostazioni che sono defaut
+    // sovrascrivi le impostazioni che sono default
     if (parametri.configPath != NULL) {
         FILE* _tConf = NULL;
 
@@ -357,7 +358,6 @@ void spawnSockets() {
             ShowErr("Impossibile creare un thread");
         }
         #else // linux
-        // TODO: ricordarsi di fare il destroy
         if (pthread_create(&threadChild[(long)q], NULL, Accept, (void*)T_s) != 0)
             printf("Failed to create thread\n");
         #endif
@@ -367,7 +367,10 @@ void spawnSockets() {
     // spawno 1 thread che gestisce i segnali:
     /*if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
         printf("Failed to create signal handling thread\n");
-        */
+    //inizializzazione mutex per file di log
+    pthread_mutex_init(&mutex_log, NULL);
+    #else //_WIN32
+    InitializeCriticalSection(&FileLock);
     #endif
 
 
@@ -399,57 +402,64 @@ void beginServer() {
 
     socklen_t addr_size;
     SOCKET newSocket = 0;
+    bool uscita = false;
 
     openLog();
 
-    #ifdef _WIN32
-    InitializeCriticalSection(&FileLock);
-    #else
-    // TODO: inizializzazione pthread lock
-    #endif
-
     // Main Thread Loop
-    while (1) {
-        // accept() crea un nuovo file-descriptor per ogni client in entrata
-        addr_size = sizeof(socketChild);
-        newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
-        printf ("Sono dopo accept - newSock:%llu\n", newSocket);
-        if (newSocket == -1) break;
-        Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
+    while (!uscita) {
+      while (1) {
+          // accept() crea un nuovo file-descriptor per ogni client in entrata
+          addr_size = sizeof(socketChild);
+          newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
+          printf ("Sono dopo accept - newSock:%d\n", newSocket);
+          if (newSocket == -1) break;
+          Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
 
-#ifdef _DEBUG
-        printf("\nConnessione in entrata\n");
-#endif // _DEBUG
+  #ifdef _DEBUG
+          printf("\nConnessione in entrata\n");
+  #endif // _DEBUG
 
-#ifdef _WIN32
-        WakeConditionVariable(&Threadwait);
-#else // linux
-        pthread_mutex_lock(&mutex);
-        wake_one = false;
-        pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
-        pthread_mutex_unlock(&mutex);
+  #ifdef _WIN32
+          WakeConditionVariable(&Threadwait);
+  #else // linux
+          pthread_mutex_lock(&mutex);
+          wake_one = false;
+          pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
+          pthread_mutex_unlock(&mutex);
 
-#endif // _WIN32
+  #endif // _WIN32
 
-    }
+      }
 
-#ifdef __linux__
-    // terminazione programma (sigint) o restart (sighup)
-    pthread_mutex_lock(&mutex);
-    esci = 1;
-    pthread_cond_broadcast(&cond_var);
-    pthread_mutex_unlock(&mutex);
-    for (long i = 0; i < parametri.nthread; i++) {
-      pthread_join(threadChild[i], NULL);
-    }
-#endif
-
+  #ifdef __linux__
+      // terminazione programma (sigint) o restart (sighup)
+      pthread_mutex_lock(&mutex);
+      esci = 1;
+      pthread_cond_broadcast(&cond_var);
+      pthread_mutex_unlock(&mutex);
+      for (long i = 0; i < parametri.nthread; i++) {
+        pthread_join(threadChild[i], NULL);
+      }
+      pthread_join(thread_handler, NULL);
+      pthread_mutex_destroy(&mutex);
+      pthread_cond_destroy(&cond_var);
+      if (signum == 2) {
+        uscita = true;
+      }
+      else {
+        printf("Riavvio del Server\n");
+        parseConfig();
+        spawnSockets();
+      }
+  #endif
+  }
 }
 
 void clearSocket() {
     // se instanziato, chiudi il socket
     if (socketMaster != 0) {
-        printf ("sto chiudento socketmaster\n");
+        printf ("sto chiudendo socketmaster\n");
 #ifdef _WIN32
         shutdown(socketMaster, SD_RECEIVE);
 #else
@@ -487,7 +497,7 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
 #ifdef _WIN32
     EnterCriticalSection(&FileLock);
 #else
-    // TODO: pthread enter critcial
+    pthread_mutex_lock(&mutex_log);
 #endif
 
     // timestamp
@@ -522,7 +532,7 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
 #ifdef _WIN32
     LeaveCriticalSection(&FileLock);
 #else
-    // TODO: pthread exit critical
+    pthread_mutex_unlock(&mutex_log);
 #endif
 
 }
@@ -545,28 +555,24 @@ void closeLog() {
   sigemptyset(&sigset);
   sigaddset(&sigset, SIGHUP);
   sigaddset(&sigset, SIGINT);
-  while (1) {
-    printf("inside handler before\n");
-    signum = sigwaitinfo(&sigset, NULL);
-    printf("inside handler after, signum: %d\n", signum);
-    CloseServer();
-    if (signum == 2)
-      break;
-  }
+  printf("inside handler before\n");
+  signum = sigwaitinfo(&sigset, NULL);
+  printf("inside handler after, signum: %d\n", signum);
+  CloseServer();
   return NULL;
 }*/
 #endif
 
 // Dopo che un thread viene creato esegue questa funzione
 void* Accept(void* rank) {
-    #ifdef __linux__
+    /*#ifdef __linux__
     // ignoro i segnali SIGUP e SIGINT
     sigset_t sigset;
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGHUP);
     sigaddset(&sigset, SIGINT);
     pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
-    #endif
+    #endif*/
     // inizializzo rand
     srand(time(NULL));
 
@@ -579,7 +585,7 @@ void* Accept(void* rank) {
     Tpid = syscall(__NR_gettid);
     #endif
 
-    while (1) {
+    while (!esci) {
         // i thread vanno a dormire
         #ifdef _WIN32
         EnterCriticalSection(&CritSec);
