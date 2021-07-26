@@ -151,7 +151,7 @@ void CloseServer() {
     #ifdef _WIN32
     DeleteCriticalSection(&FileLock);
     #else
-        // TODO: distruzione pthread lock
+    pthread_mutex_destroy(&mutex_log);
     #endif
     if (signum == 2) {
       if(FileDescLog != NULL)
@@ -330,7 +330,6 @@ void spawnSockets() {
             ShowErr("Impossibile creare un thread");
         }
         #else // linux
-        // TODO: ricordarsi di fare il destroy
         if (pthread_create(&threadChild[(long)q], NULL, Accept, (void*)T_s) != 0)
             printf("Failed to create thread\n");
         #endif
@@ -340,6 +339,10 @@ void spawnSockets() {
     // spawno 1 thread che gestisce i segnali:
     if (pthread_create(&thread_handler, NULL, SigHandler, NULL) != 0)
         printf("Failed to create signal handling thread\n");
+    //inizializzazione mutex per file di log
+    pthread_mutex_init(&mutex_log, NULL);
+    #else //_WIN32
+    InitializeCriticalSection(&FileLock);
     #endif
 
 
@@ -374,12 +377,6 @@ void beginServer() {
     bool uscita = false;
 
     openLog();
-
-    #ifdef _WIN32
-    InitializeCriticalSection(&FileLock);
-    #else
-    // TODO: inizializzazione pthread lock
-    #endif
 
     // Main Thread Loop
     while (!uscita) {
@@ -427,7 +424,6 @@ void beginServer() {
         parseConfig();
         spawnSockets();
       }
-
   #endif
   }
 }
@@ -473,7 +469,7 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
 #ifdef _WIN32
     EnterCriticalSection(&FileLock);
 #else
-    // TODO: pthread enter critcial
+    pthread_mutex_lock(&mutex_log);
 #endif
 
     // timestamp
@@ -507,7 +503,7 @@ void writeLog(unsigned long int Tpid, SOCKET soc, char* command) {
 #ifdef _WIN32
     LeaveCriticalSection(&FileLock);
 #else
-    // TODO: pthread exit critical
+    pthread_mutex_unlock(&mutex_log);
 #endif
 
 
@@ -541,14 +537,14 @@ void* SigHandler(void* dummy) {
 
 // Dopo che un thread viene creato esegue questa funzione
 void* Accept(void* rank) {
-    #ifdef __linux__
+    /*#ifdef __linux__
     // ignoro i segnali SIGUP e SIGINT
     sigset_t sigset;
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGHUP);
     sigaddset(&sigset, SIGINT);
     pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
-    #endif
+    #endif*/
     // inizializzo rand
     srand(time(NULL));
 
@@ -561,7 +557,7 @@ void* Accept(void* rank) {
     Tpid = syscall(__NR_gettid);
     #endif
 
-    while (1) {
+    while (!esci) {
         // i thread vanno a dormire
         #ifdef _WIN32
         EnterCriticalSection(&CritSec);

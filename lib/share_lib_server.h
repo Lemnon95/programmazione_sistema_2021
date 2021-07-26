@@ -53,6 +53,7 @@ inline pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 inline pthread_cond_t cond_var = PTHREAD_COND_INITIALIZER;
 inline pthread_t* threadChild = NULL;
 inline pthread_t thread_handler;
+inline pthread_mutex_t mutex_log = PTHREAD_MUTEX_INITIALIZER;
 inline bool wake_one = true;
 inline sig_atomic_t esci = 0;
 inline int chiusura = 0;
