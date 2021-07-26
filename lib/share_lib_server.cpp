@@ -567,14 +567,6 @@ void* SigHandler(void* dummy) {
 
 // Dopo che un thread viene creato esegue questa funzione
 void* Accept(void* rank) {
-    /*#ifdef __linux__
-    // ignoro i segnali SIGUP e SIGINT
-    sigset_t sigset;
-    sigemptyset(&sigset);
-    sigaddset(&sigset, SIGHUP);
-    sigaddset(&sigset, SIGINT);
-    pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
-    #endif*/
     // inizializzo rand
     srand(time(NULL));
 
