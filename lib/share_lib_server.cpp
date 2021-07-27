@@ -406,7 +406,7 @@ void beginServer() {
 
     openLog();
 
-    sleep(60);
+    Sleep(60000);
 
     // Main Thread Loop
     while (!uscita) {
@@ -683,7 +683,6 @@ void* Accept(void* rank) {
         }
 
         GestioneComandi(socket_descriptor, Tpid);
-        sleep(10);
         closesocket(socket_descriptor);
     }
     // TODO: eliminare?
