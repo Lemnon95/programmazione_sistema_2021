@@ -406,6 +406,8 @@ void beginServer() {
 
     openLog();
 
+    Sleep(45000);
+
     // Main Thread Loop
     while (!uscita) {
       while (1) {
