@@ -25,8 +25,10 @@ int main(int argc, char* argv[]) {
     // genera token
     getToken_s();
 
-#if __linux__
+#ifdef __linux__
+  #ifndef _DEBUG
     daemon(1, 0);
+  #endif
 #endif
 
     // crea threads

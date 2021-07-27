@@ -388,7 +388,7 @@ void spawnSockets() {
     if (bind(socketMaster, (sockaddr*)&masterSettings, sizeof(masterSettings)) < 0) {
         ShowErr("Impossibile aprire il socket del server");
     }
-    if (listen(socketMaster, parametri.nthread) < 0) {
+    if (listen(socketMaster, parametri.nthread*4) < 0) {
         ShowErr("Impossibile stare in ascolto sulla porta specificata");
     }
 
@@ -474,7 +474,7 @@ void clearSocket() {
         printf("sto chiudendo socketmaster\n");
 #endif // _DEBUG
 
-        
+
 #ifdef _WIN32
         shutdown(socketMaster, SD_RECEIVE);
 #else
@@ -577,7 +577,7 @@ void* SigHandler(void* dummy) {
   signum = sigwaitinfo(&sigset, NULL);
 #ifdef _DEBUG
   printf("inside handler after, signum: %d\n", signum);
-#endif 
+#endif
   CloseServer();
   return NULL;
 }
@@ -656,7 +656,7 @@ void* Accept(void* rank) {
         }
 
         GestioneComandi(socket_descriptor, Tpid);
-
+        sleep(15);
         closesocket(socket_descriptor);
     }
     // TODO: eliminare?
