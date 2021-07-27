@@ -625,6 +625,9 @@ void* Accept(void* rank) {
         }
         #else //linux
         pthread_mutex_lock(&mutex);
+
+        // TODO: consumatore / produttore
+
         while (wake_one) {
           if(pthread_cond_wait(&cond_var, &mutex) != 0) {
               printf("\nerr: %s\n", strerror(errno));
@@ -656,7 +659,7 @@ void* Accept(void* rank) {
         }
 
         GestioneComandi(socket_descriptor, Tpid);
-        sleep(15);
+        sleep(10);
         closesocket(socket_descriptor);
     }
     // TODO: eliminare?
