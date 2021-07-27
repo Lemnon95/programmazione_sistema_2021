@@ -406,8 +406,6 @@ void beginServer() {
 
     openLog();
 
-    Sleep(60000);
-
     // Main Thread Loop
     while (!uscita) {
       while (1) {
@@ -416,7 +414,9 @@ void beginServer() {
           newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
           printf ("Sono dopo accept - newSock:%d\n", newSocket);
           if (newSocket == -1) break;
+          pthread_mutex_lock(&mutex); //ci serve una sezione critica per la variabile size della coda
           Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
+          pthread_mutex_unlock(&mutex);
 
   #ifdef _DEBUG
           printf("\nConnessione in entrata\n");
@@ -632,7 +632,7 @@ void* Accept(void* rank) {
             LeaveCriticalSection(&CritSec);
             return NULL;
         }
-        
+
         #else //linux
         pthread_mutex_lock(&mutex);
 
@@ -666,7 +666,7 @@ void* Accept(void* rank) {
             return NULL;
         }
 
-        
+
         #endif
         // sezione critica
 
