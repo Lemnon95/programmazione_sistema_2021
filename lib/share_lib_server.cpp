@@ -406,6 +406,8 @@ void beginServer() {
 
     openLog();
 
+    sleep(60);
+
     // Main Thread Loop
     while (!uscita) {
       while (1) {
@@ -627,22 +629,27 @@ void* Accept(void* rank) {
         pthread_mutex_lock(&mutex);
 
         // TODO: consumatore / produttore
+        if (size == 0) {
 
-        while (wake_one) {
-          if(pthread_cond_wait(&cond_var, &mutex) != 0) {
-              printf("\nerr: %s\n", strerror(errno));
-          }
-          if (esci) {
-            chiusura++;
+            while (wake_one) {
+                if (pthread_cond_wait(&cond_var, &mutex) != 0) {
+                    printf("\nerr: %s\n", strerror(errno));
+                }
+                if (esci) {
+                    chiusura++;
 #ifdef _DEBUG
-            pid_t x = syscall(__NR_gettid);
-            printf("Exit Thread number: %d\n", x);
+                    pid_t x = syscall(__NR_gettid);
+                    printf("Exit Thread number: %d\n", x);
 #endif // _DEBUG
-            pthread_mutex_unlock(&mutex);
-            return NULL;
-          }
+                    pthread_mutex_unlock(&mutex);
+                    return NULL;
+                }
+            }
+            wake_one = true;
+
         }
-        wake_one = true;
+
+        
         #endif
         // sezione critica
 
