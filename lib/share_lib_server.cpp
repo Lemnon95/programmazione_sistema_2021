@@ -414,22 +414,20 @@ void beginServer() {
           newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
           printf ("Sono dopo accept - newSock:%d\n", newSocket);
           if (newSocket == -1) break;
-          pthread_mutex_lock(&mutex); //ci serve una sezione critica per la variabile size della coda
+          
+          //ci serve una sezione critica per la variabile size della coda
+#ifdef _WIN32 
+          EnterCriticalSection(&CritSec);
           Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
-          pthread_mutex_unlock(&mutex);
-
-  #ifdef _DEBUG
-          printf("\nConnessione in entrata\n");
-  #endif // _DEBUG
-
-  #ifdef _WIN32
           WakeConditionVariable(&Threadwait);
-  #else // linux
+          LeaveCriticalSection(&CritSec);
+#else // linux
           pthread_mutex_lock(&mutex);
+          Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
           wake_one = false;
           pthread_cond_signal(&cond_var);	//sveglio un thread per gestire la nuova connessione
           pthread_mutex_unlock(&mutex);
-  #endif // _WIN32
+#endif // _WIN32
 
       }
 
