@@ -620,11 +620,19 @@ void* Accept(void* rank) {
         // i thread vanno a dormire
         #ifdef _WIN32
         EnterCriticalSection(&CritSec);
-        SleepConditionVariableCS(&Threadwait, &CritSec, INFINITE);
+
+        if (size == 0) {
+            SleepConditionVariableCS(&Threadwait, &CritSec, INFINITE);
+            if (esci) {
+                LeaveCriticalSection(&CritSec);
+                return NULL;
+            }
+        }
         if (esci) {
             LeaveCriticalSection(&CritSec);
             return NULL;
         }
+        
         #else //linux
         pthread_mutex_lock(&mutex);
 
@@ -647,6 +655,15 @@ void* Accept(void* rank) {
             }
             wake_one = true;
 
+        }
+        if (esci) {
+            chiusura++;
+#ifdef _DEBUG
+            pid_t x = syscall(__NR_gettid);
+            printf("Exit Thread number: %d\n", x);
+#endif // _DEBUG
+            pthread_mutex_unlock(&mutex);
+            return NULL;
         }
 
         
