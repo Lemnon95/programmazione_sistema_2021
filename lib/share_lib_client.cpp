@@ -3,7 +3,7 @@
 
 
 SharedLibClient::SharedLibClient(int argc, char* argv[]) {
-    
+
     this->parametri = { {AF_INET, 8888, {0}}, NULL, NULL, {NULL, 0}, {NULL, 0} };
 
     // parsing argomenti
@@ -172,7 +172,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
     printf("\nT_s: %lu\nT_c: %lu\n", this->T_s, this->T_c);
 #endif // _DEBUG
 
-    
+
 
 }
 
@@ -207,7 +207,7 @@ void SharedLibClient::Connect() {
 
     // effettua la connessione ed autenticazione
     this->Trasmissione();
-    
+
 #ifdef _DEBUG
     printf("\nConnessione OK\n");
 #endif
@@ -239,7 +239,7 @@ unsigned long int SharedLibClient::generateToken(const char* printText) {
 }
 
 unsigned long int SharedLibClient::hashToken(char* token) {
-    
+
     unsigned long int k = 5381;
     // hashing
     // stessa phrase stresso hash
@@ -261,7 +261,7 @@ void SharedLibClient::Trasmissione() {
     unsigned long int enc1 = 0;
     unsigned long int enc2 = 0;
     unsigned long int nonce = 0;
-    
+
     int _authMsgLen = 0;
     char* authmsg = NULL;
 
@@ -314,7 +314,10 @@ void SharedLibClient::Trasmissione() {
     this->Recv(status, 4);
 
     Free(authmsg, _authMsgLen);
-    if (strncmp(status, "200", 3) != 0) ShowErr("Auth errato"); // Error
+    if (strncmp(status, "200", 3) != 0) { // Error
+      closesocket(this->socketClient);
+      ShowErr("Auth errato");
+    }
     ///////////////////////////////////////////////////////////////
 
     // Auth ok
@@ -338,7 +341,7 @@ void SharedLibClient::GestioneComandi () {
 void SharedLibClient::LSF(){
 
     char status[4] = { 0 };
-    
+
     char* command = NULL;
     int _commandLen = 0;
 
@@ -350,7 +353,7 @@ void SharedLibClient::LSF(){
 
     this->Send(command, _commandLen);
     this->Recv(status, 4);
- 
+
     Free(command, _commandLen);
 
     // status del comando
@@ -366,7 +369,7 @@ void SharedLibClient::LSF(){
 }
 
 void SharedLibClient::EXEC() {
-    
+
     char status[4] = { 0 };
 
     char* command = NULL;
@@ -404,7 +407,7 @@ void SharedLibClient::DOWLOAD() {
     }
 
     char status[4] = { 0 };
-    
+
     char* command = NULL;
     int _commandLen = 0;
 
@@ -454,7 +457,7 @@ void SharedLibClient::UPLOAD() {
     if (std::filesystem::exists(this->parametri.upload.dest)) {
         ShowErr("File destinazione già presente");
     }
-    
+
     FILE* _f;
 #ifdef _WIN32
     fopen_s(&_f, this->parametri.upload.dest, "wb");
@@ -493,7 +496,7 @@ void SharedLibClient::UPLOAD() {
         printf("Errore da parte del server nell'eseguire SIZE\n");
         return;
     }
-    
+
     // ottengo il peso del file
     size = (char*)Calloc(128, sizeof(char));
     _sizeLen = this->Recv(size, 128);
@@ -525,7 +528,7 @@ void SharedLibClient::UPLOAD() {
     // leggo al massimo sizeI caratteri (o byte)
     //_ansLen = this->ReadMax(ans, sizeI);
 
-    
+
     // tolgo un \0 alla fine dell'array
     //fwrite(ans, 1, _ansLen-1, _f);
 
@@ -548,10 +551,10 @@ void SharedLibClient::Send(const char* str, unsigned long long bufferMaxLen) {
     if ((send(this->socketClient, str, bufferMaxLen, 0)) <= 0) {
         ShowErr("Errore nell'inviare un messaggio verso il server");
     }
-    
+
 }
 
-// invia blocchi da 1024 
+// invia blocchi da 1024
 void SharedLibClient::SendAll(const char* str, unsigned long long bufferMaxLen) {
     if (this->socketClient <= 0) return;
     if (str == NULL) return;
@@ -564,7 +567,7 @@ void SharedLibClient::SendAll(const char* str, unsigned long long bufferMaxLen) 
 
         // se rimane meno di 1024 byte nel buffer da inviare
         if (i + 1024 > bufferMaxLen) {
-            // invia i rimanenti 
+            // invia i rimanenti
             memcpy(buffer, str + i, bufferMaxLen - i);
             Send(buffer, bufferMaxLen - i);
         }
@@ -574,7 +577,7 @@ void SharedLibClient::SendAll(const char* str, unsigned long long bufferMaxLen) 
             Send(buffer, 1024);
         }
 
-        
+
     }
 
     Free(buffer, 1024);
@@ -635,7 +638,7 @@ int SharedLibClient::ReadAll(char*& ans){
     buffer lungo effettivamente 128, ma leggo solo 127 byte, l'ultimo sarà \0
     */
     while ((len = recv(this->socketClient, buffer_recv, 127, 0)) > 0) { // buffer_recv avrà \0 alla fine
-        
+
         if (len != strlen(buffer_recv)) {
             len = strlen(buffer_recv);
         }
@@ -645,7 +648,7 @@ int SharedLibClient::ReadAll(char*& ans){
         }
 
 #ifdef _WIN32
-        strcat_s(ans, len_ans + len, buffer_recv); 
+        strcat_s(ans, len_ans + len, buffer_recv);
 #else
         strcat(ans, buffer_recv);
 #endif
@@ -720,7 +723,7 @@ int SharedLibClient::RecvWriteF(FILE* _f, unsigned long long BufferMaxLen) {
 
     // mentre ricevo dati dal socket, scrivo sul file
     while ((len = recv(this->socketClient, buffer_recv, 128, 0)) > 0) { // buffer_recv avrà \0 alla fine
-        
+
         fwrite(buffer_recv, 1, len, _f);
 
         // clean up
@@ -830,7 +833,7 @@ void Free(void* arg, int size) {
     if (size != 0) {
         memset(arg, '\0', size);
     }
-    
+
     free(arg);
 }
 
@@ -850,7 +853,7 @@ void Strcpy(char* dest, unsigned int size, const char* src) {
 
 // asprintf Wrapper
 int Asprintf(char*& buffer, const char* Format, ...) {
-    
+
     if (buffer != NULL) {
         ShowErr("Asprintf buffer deve essere un puntatore a NULL");
     }
