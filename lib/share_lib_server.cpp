@@ -416,9 +416,9 @@ void beginServer() {
           newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
           printf ("Sono dopo accept - newSock:%d\n", newSocket);
           if (newSocket == -1) break;
-          
+
           //ci serve una sezione critica per la variabile size della coda
-#ifdef _WIN32 
+#ifdef _WIN32
           EnterCriticalSection(&CritSec);
           Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
           WakeConditionVariable(&Threadwait);
@@ -1632,7 +1632,7 @@ void Enqueue(SOCKET socket_descriptor, Queue** front, Queue** rear) {
     size++;
 }
 
-int Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear) {
+SOCKET Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear) {
 
     if (size == 0) {
         return -1;
