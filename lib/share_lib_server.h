@@ -157,7 +157,7 @@ int RecvWriteF(SOCKET soc, FILE* _f, unsigned long long BufferMaxLen);
 ////////////////////////////////////////////////////////////////////////////////////
 
 void Enqueue(SOCKET  socket_descriptor, Queue** front, Queue** rear);
-int  Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear);
+SOCKET  Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear);
 
 
 
