@@ -1632,7 +1632,7 @@ void Enqueue(SOCKET socket_descriptor, Queue** front, Queue** rear) {
     size++;
 }
 
-SOCKET Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear) {
+int Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear) {
 
     if (size == 0) {
         return -1;
