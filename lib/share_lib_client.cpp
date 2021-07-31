@@ -240,7 +240,8 @@ unsigned long int SharedLibClient::generateToken(const char* printText) {
 
 unsigned long int SharedLibClient::hashToken(char* token) {
 
-    unsigned long int k = 5381;
+    int q = 5381;
+    unsigned long int k = 0;
     // hashing
     // stessa phrase stresso hash
     // no fattori randomici
@@ -248,7 +249,7 @@ unsigned long int SharedLibClient::hashToken(char* token) {
     // bisogna basarci solo sull'input
     // e/o valori costanti
     for (int i = 0; i < strlen(token); ++i)
-        k = (k * 27) + token[i];
+        k = q + token[i] * (i + 1);
 
     return k;
 }

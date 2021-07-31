@@ -304,8 +304,8 @@ unsigned long int generateToken() {
 
 unsigned long int hashToken(char* token) {
     //TODO: migliorare
-
-    unsigned long int k = 5381;
+    int q = 5381;
+    unsigned long int k = 0;
     // hashing
     // stessa phrase stresso hash
     // no fattori randomici
@@ -313,7 +313,7 @@ unsigned long int hashToken(char* token) {
     // bisogna basarci solo sull'input
     // e/o valori costanti
     for (int i = 0; i < strlen(token); ++i)
-        k = (k * 27) + token[i];
+        k = q + token[i] * (i+1);
 
     return k;
 }
@@ -405,8 +405,6 @@ void beginServer() {
     bool uscita = false;
 
     openLog();
-
-    Sleep(45000);
 
     // Main Thread Loop
     while (!uscita) {
