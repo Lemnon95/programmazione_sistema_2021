@@ -303,7 +303,7 @@ unsigned long int generateToken() {
 }
 
 unsigned long int hashToken(char* token) {
-    //TODO: migliorare
+
     int q = 5381;
     unsigned long int k = 0;
     // hashing
@@ -634,7 +634,6 @@ void* Accept(void* rank) {
         #else //linux
         pthread_mutex_lock(&mutex);
 
-        // TODO: consumatore / produttore
         if (size == 0) {
 
             while (wake_one) {
