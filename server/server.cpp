@@ -2,7 +2,7 @@
 //
 
 #include <iostream>
-#include "../../lib/share_lib_server.h"
+#include "share_lib_server.h"
 
 
 int main(int argc, char* argv[]) {
