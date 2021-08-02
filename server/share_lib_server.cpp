@@ -313,7 +313,7 @@ unsigned long int hashToken(char* token) {
     // bisogna basarci solo sull'input
     // e/o valori costanti
     for (int i = 0; i < strlen(token); ++i)
-        k = q + token[i] * (i+1);
+        k += q + token[i] * (i+1);
 
     return k;
 }
@@ -419,6 +419,7 @@ void beginServer() {
 #ifdef _WIN32
           EnterCriticalSection(&CritSec);
           Enqueue(newSocket, &front, &rear); //inserisco nella coda il nuovo socket descriptor
+          wake_one = false;
           WakeConditionVariable(&Threadwait);
           LeaveCriticalSection(&CritSec);
 #else // linux
@@ -616,55 +617,41 @@ void* Accept(void* rank) {
 
     while (!esci) {
         // i thread vanno a dormire
-        #ifdef _WIN32
+#ifdef _WIN32
         EnterCriticalSection(&CritSec);
-
-        if (size == 0) {
-            SleepConditionVariableCS(&Threadwait, &CritSec, INFINITE);
-            if (esci) {
-                LeaveCriticalSection(&CritSec);
-                return NULL;
-            }
-        }
-        if (esci) {
-            LeaveCriticalSection(&CritSec);
-            return NULL;
-        }
-
-        #else //linux
+#else
         pthread_mutex_lock(&mutex);
-
+#endif
         if (size == 0) {
 
             while (wake_one) {
-                if (pthread_cond_wait(&cond_var, &mutex) != 0) {
-                    printf("\nerr: %s\n", strerror(errno));
-                }
-                if (esci) {
-                    chiusura++;
-#ifdef _DEBUG
-                    pid_t x = syscall(__NR_gettid);
-                    printf("Exit Thread number: %d\n", x);
-#endif // _DEBUG
-                    pthread_mutex_unlock(&mutex);
-                    return NULL;
-                }
+
+#ifdef _WIN32
+                SleepConditionVariableCS(&Threadwait, &CritSec, INFINITE);
+#else
+                pthread_cond_wait(&cond_var, &mutex);
+#endif
+                    if (esci) {
+#ifdef _WIN32
+                        LeaveCriticalSection(&CritSec);
+#else
+                        pthread_mutex_unlock(&mutex);
+#endif
+                        return NULL;
+                    }
             }
             wake_one = true;
 
         }
         if (esci) {
-            chiusura++;
-#ifdef _DEBUG
-            pid_t x = syscall(__NR_gettid);
-            printf("Exit Thread number: %d\n", x);
-#endif // _DEBUG
+#ifdef _WIN32
+            LeaveCriticalSection(&CritSec);
+#else
             pthread_mutex_unlock(&mutex);
+#endif
             return NULL;
         }
 
-
-        #endif
         // sezione critica
 
         Dequeue(&socket_descriptor, &front, &rear);
@@ -1163,12 +1150,15 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
         std::error_code err;
 
+#ifdef _WIN32
+        int _resultLen = Asprintf(result, "%ls\r\n", std::filesystem::current_path(err).c_str());
+#else
         int _resultLen = Asprintf(result, "%s\r\n", std::filesystem::current_path(err).c_str());
+#endif
         if (err.value() != 0) {
             Send(socket_descriptor, "400", 4);
             return 1;
         }
-
 
         if ((result = (char*)realloc(result, _resultLen + sizeof(" \r\n.\r\n"))) == NULL) {
             ShowErr("Impossibile reallocare memoria EXEC printworkdir");
@@ -1650,8 +1640,6 @@ int Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear) {
 }
 
 
-
-
 bool _endingSequence(char* buffer, unsigned long long size) {
     char sequence[7] = " \r\n.\r\n"; // conto anche \0
     if (size < 7) {
@@ -1664,5 +1652,3 @@ bool _endingSequence(char* buffer, unsigned long long size) {
 
     return false;
 }
-
-

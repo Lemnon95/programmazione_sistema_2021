@@ -59,7 +59,6 @@ inline pthread_cond_t cond_var = PTHREAD_COND_INITIALIZER;
 inline pthread_t* threadChild = NULL;
 inline pthread_t thread_handler;
 inline pthread_mutex_t mutex_log = PTHREAD_MUTEX_INITIALIZER;
-inline bool wake_one = true;
 inline sig_atomic_t esci = 0;
 inline int chiusura = 0;
 inline int signum;
@@ -107,6 +106,7 @@ inline unsigned long int T_s = 0;
 inline FILE* FileDescLog = NULL;
 inline SOCKET socketMaster = 0;
 inline sockaddr_storage socketChild;
+inline bool wake_one = true;
 
 ////////////////////////////////////////////////////////////////////////////////////
 // funzioni
@@ -161,7 +161,4 @@ void Enqueue(SOCKET  socket_descriptor, Queue** front, Queue** rear);
 int  Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear);
 
 
-
 bool _endingSequence(char* buffer, unsigned long long size);
-
-

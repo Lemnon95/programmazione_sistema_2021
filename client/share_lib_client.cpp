@@ -249,7 +249,7 @@ unsigned long int SharedLibClient::hashToken(char* token) {
     // bisogna basarci solo sull'input
     // e/o valori costanti
     for (int i = 0; i < strlen(token); ++i)
-        k = q + token[i] * (i + 1);
+        k += q + token[i] * (i + 1);
 
     return k;
 }
