@@ -206,7 +206,7 @@ void parseConfig() {
         while (fscanf(_tConf, "%d %s", &i, configData
 #ifdef _WIN32
             , 1024
-#endif // _WIN32
+#endif // fscanf_s richiede che dopo un array sia specificato la sua grandezza
         ) > 0) {
 
             if (configData[0] == '\0') {
