@@ -203,7 +203,11 @@ void parseConfig() {
         unsigned short port = 0;
         // legge per linea
         // \r non viene aggiunto a configData
-        while (fscanf(_tConf, "%d %s", &i, configData) > 0) {
+        while (fscanf(_tConf, "%d %s", &i, configData
+#ifdef _WIN32
+            , 1024
+#endif // _WIN32
+        ) > 0) {
 
             if (configData[0] == '\0') {
                 continue;
