@@ -9,6 +9,8 @@
 
 // calloc Wrapper
 void* Calloc(size_t nmemb, size_t size);
+//
+void* Realloc(void* var, size_t new_size);
 // fprintf Wrapper
 void ShowErr(const char* str);
 // free Wrapper

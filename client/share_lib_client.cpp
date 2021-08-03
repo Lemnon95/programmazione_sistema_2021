@@ -612,7 +612,7 @@ int SharedLibClient::Recv(char* _return, unsigned long long bufferMaxLen) {
                 return -1;
             }
 
-            _return = (char*)realloc(_return, max + len);
+            _return = (char*)Realloc(_return, max + len);
             memcpy(_return + max, moreBuf, len);
             max += len;
         }
@@ -644,9 +644,7 @@ int SharedLibClient::ReadAll(char*& ans){
             len = strlen(buffer_recv);
         }
 
-        if ((ans = (char*)realloc(ans, len_ans + len)) == NULL) {
-            ShowErr("Impossibile allocare memoria per il ReadAll");
-        }
+        ans = (char*)Realloc(ans, len_ans + len);
 
 #ifdef _WIN32
         strcat_s(ans, len_ans + len, buffer_recv);
@@ -688,9 +686,7 @@ int SharedLibClient::ReadMax(char*& ans, unsigned long long BufferMaxLen) {
             len = strlen(buffer_recv);
         }
 
-        if ((ans = (char*)realloc(ans, len_ans + len)) == NULL) {
-            ShowErr("Impossibile allocare memoria per il ReadAll");
-        }
+        ans = (char*)Realloc(ans, len_ans + len);
 
 #ifdef _WIN32
         strcat_s(ans, len_ans + len, buffer_recv);

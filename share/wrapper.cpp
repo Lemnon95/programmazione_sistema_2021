@@ -18,6 +18,20 @@ void* Calloc(size_t count, size_t size) {
     return _t;
 }
 
+//
+void* Realloc(void* var, size_t new_size) {
+
+    if (var == NULL) {
+        ShowErr("variabile null passata a Realloc");
+    }
+    var = realloc(var, new_size);
+    if (var == NULL) {
+        ShowErr("Impossibile ri-allocare memoria");
+    }
+
+    return var;
+}
+
 // fprintf Wrapper
 void ShowErr(const char* str) {
     char t[1024] = { 0 };

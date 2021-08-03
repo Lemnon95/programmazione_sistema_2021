@@ -828,9 +828,7 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
 
       memset(command, '\0', _commandLen);
 
-      if ((command = (char*)realloc(command, 1024)) == NULL) {
-          ShowErr("Impossibile riallocare memoria");
-      }
+      command = (char*)Realloc(command, 1024);
       Free(dup_cmd, _commandLen);
   }
 
@@ -873,9 +871,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
         _bufferLen = asprintf(&buffer, "%llu %s\r\n", size, &(file.c_str())[0])+1;
 #endif
 
-        if ((records = (char*)realloc(records, (_recordsLen + _bufferLen))) == NULL) {
-            ShowErr("Impossibile allocare memoria per i file della funzione LSF");
-        }
+        records = (char*)Realloc(records, (_recordsLen + _bufferLen));
 
         #ifdef _WIN32
         strcat_s(records, _recordsLen + _bufferLen, buffer);
@@ -891,9 +887,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
 
     _recordsLen += sizeof(" \r\n.\r\n");
 
-    if ((records = (char*)realloc(records, _recordsLen )) == NULL) {
-        ShowErr("Impossibile reallocare memoria");
-    }
+    records = (char*)Realloc(records, _recordsLen);
 
     #ifdef _WIN32
     strcat_s(records, _recordsLen, " \r\n.\r\n");
@@ -945,10 +939,8 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
             Strcpy(list[i], strlen(_t)+1, _t);
             i++;
-            list = (char**)realloc(list, (i+1)* sizeof(char**));
-            if (list == NULL) {
-                ShowErr("Errore nell'allocare lista in EXEC comando copy");
-            }
+            list = (char**)Realloc(list, (i+1)* sizeof(char**));
+            
         }
 
         // copy  || copy path1
@@ -987,9 +979,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                 // componi la stringa
                 _bufferLen = Asprintf(buffer, "%s\r\n", list[k]);
 
-                if ((result = (char*)realloc(result, (_resultLen + _bufferLen))) == NULL) {
-                    ShowErr("Impossibile allocare memoria per i file della funzione LSF");
-                }
+                result = (char*)Realloc(result, (_resultLen + _bufferLen));
 
                 _resultLen += _bufferLen;
                 errno = 0;
@@ -1009,9 +999,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
         _resultLen += sizeof(" \r\n.\r\n");
 
-        if ((result = (char*)realloc(result, _resultLen)) == NULL) {
-            ShowErr("Impossibile allocare memoria");
-        }
+        result = (char*)Realloc(result, _resultLen);
 
         #ifdef _WIN32
         strcat_s(result, _resultLen, " \r\n.\r\n");
@@ -1042,10 +1030,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             }
             Strcpy(list[i], strlen(_t) + 1, _t);
             i++;
-            list = (char**)realloc(list, (i + 1) * sizeof(char**));
-            if (list == NULL) {
-                ShowErr("Errore nell'allocare lista in EXEC comando remove");
-            }
+            list = (char**)Realloc(list, (i + 1) * sizeof(char**));
         }
 
         // remove
@@ -1068,9 +1053,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 
                 int _bufferLen = Asprintf(buffer, "%s\r\n", list[k]);
 
-                if ((result = (char*)realloc(result, (strlen(result) + _bufferLen))) == NULL) {
-                    ShowErr("Impossibile allocare memoria per i file della funzione LSF");
-                }
+                result = (char*)Realloc(result, (strlen(result) + _bufferLen));
 
                 errno = 0;
                 #ifdef _WIN32
@@ -1088,10 +1071,8 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             }
         }
 
-        result = (char*)realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
-        if (result == NULL) {
-            ShowErr("Impossibile riallocare memoria dentro EXEC remove");
-        }
+        result = (char*)Realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
+        
 
 
 #ifdef _WIN32
@@ -1128,10 +1109,8 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
 #endif
 
 
-        result = (char*)realloc(result, strlen(result) + sizeof("\r\n \r\n.\r\n"));
-        if (result == NULL) {
-            ShowErr("Impossibile allocare memoria in EXEC whoami");
-        }
+        result = (char*)Realloc(result, strlen(result) + sizeof("\r\n \r\n.\r\n"));
+        
 
 #ifdef _WIN32
         strcat_s(result, strlen(result) + sizeof("\r\n \r\n.\r\n"), "\r\n \r\n.\r\n");
@@ -1160,9 +1139,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             return 1;
         }
 
-        if ((result = (char*)realloc(result, _resultLen + sizeof(" \r\n.\r\n"))) == NULL) {
-            ShowErr("Impossibile reallocare memoria EXEC printworkdir");
-        }
+        result = (char*)Realloc(result, _resultLen + sizeof(" \r\n.\r\n"));
 
         #ifdef _WIN32
         strcat_s(result, _resultLen + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
@@ -1351,10 +1328,8 @@ char* _exec(const char* cmd) {
     try {
         while (fgets(buffer, sizeof(buffer)-1, pipe) != NULL) {
 
-            result = (char*)realloc(result, strlen(result)+strlen(buffer)+1 );
-            if (result == NULL) {
-                ShowErr("Impossibile allocare memoria per _exec");
-            }
+            result = (char*)Realloc(result, strlen(result)+strlen(buffer)+1 );
+            
 #ifdef _WIN32
             strcat_s(result, strlen(result) + strlen(buffer) + 1, buffer);
 #else
@@ -1461,7 +1436,7 @@ int Recv(SOCKET soc, char* _return, unsigned long long bufferMaxLen) {
                 return -1;
             }
 
-            _return = (char*)realloc(_return, max + len);
+            _return = (char*)Realloc(_return, max + len);
             memcpy(_return + max, moreBuf, len);
             max += len;
         }
@@ -1492,9 +1467,7 @@ int ReadAll(SOCKET soc, char*& ans) {
             len = strlen(buffer_recv);
         }
 
-        if ((ans = (char*)realloc(ans, len_ans + len)) == NULL) {
-            ShowErr("Impossibile allocare memoria per il ReadAll");
-        }
+        ans = (char*)Realloc(ans, len_ans + len);
 
 #ifdef _WIN32
         strcat_s(ans, len_ans + len, buffer_recv);
@@ -1528,35 +1501,6 @@ int ReadMax(SOCKET soc, char*& ans, unsigned long long BufferMaxLen) {
     int len_ans = 1;
 
     len_ans = recv(soc, ans, BufferMaxLen, MSG_WAITALL);
-
-    /*
-    buffer lungo effettivamente 128, ma leggo solo 127 byte, l'ultimo sarà \0
-
-    while ((len = recv(soc, buffer_recv, 127, 0)) > 0) { // buffer_recv avrà \0 alla fine
-
-        if (len != strlen(buffer_recv)) {
-            len = strlen(buffer_recv);
-        }
-
-        if ((ans = (char*)realloc(ans, len_ans + len)) == NULL) {
-            ShowErr("Impossibile allocare memoria per il ReadAll");
-        }
-
-#ifdef _WIN32
-        strcat_s(ans, len_ans + len, buffer_recv);
-#else
-        strcat(ans, buffer_recv);
-#endif
-
-        // clean up
-        memset(buffer_recv, '\0', len);
-        len_ans += len;
-
-        if (len_ans + 1 >= BufferMaxLen) {
-            break;
-        }
-    }
-    */
 
     //Free(buffer_recv);
 
