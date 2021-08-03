@@ -9,7 +9,7 @@
 
 // calloc Wrapper
 void* Calloc(size_t nmemb, size_t size);
-//
+// realloc Wrapper
 void* Realloc(void* var, size_t new_size);
 // fprintf Wrapper
 void ShowErr(const char* str);
@@ -19,3 +19,5 @@ void Free(void* arg, size_t size = 0);
 void Strcpy(char* dest, size_t size, const char* src);
 // asprintf Wrapper
 int Asprintf(char*& buffer, const char* Format, ...);
+// fopen Wrapper
+bool Fopen(FILE** f, const char* FileName, const char* Mode);

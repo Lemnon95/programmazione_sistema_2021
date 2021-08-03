@@ -183,13 +183,7 @@ void parseConfig() {
     if (parametri.configPath != NULL) {
         FILE* _tConf = NULL;
 
-        #ifdef _WIN32
-        fopen_s(&_tConf, parametri.configPath, "r");
-        #else // linux
-        _tConf = fopen(parametri.configPath, "r");
-        #endif
-        if (_tConf == NULL) {
-            //ShowErr("impossibile aprire file config");
+        if(!Fopen(&_tConf, parametri.configPath, "r")) {
             return;
         }
 
@@ -412,7 +406,9 @@ void beginServer() {
           // accept() crea un nuovo file-descriptor per ogni client in entrata
           addr_size = sizeof(socketChild);
           newSocket = accept(socketMaster, (sockaddr*)&(socketChild), &addr_size);
-          printf ("Sono dopo accept - newSock:%d\n", newSocket);
+#ifdef _DEBUG
+          printf ("Sono dopo accept - newSock:%lu\n", newSocket);
+#endif
           if (newSocket == -1) break;
 
           //ci serve una sezione critica per la variabile size della coda
@@ -496,15 +492,8 @@ void openLog() {
     if (FileDescLog == NULL) {
         // se non è aperto
         // apri il file in modalità Append
-        #ifdef _WIN32
-        fopen_s(&FileDescLog, parametri.logPath, "a");
-        #else
-        FileDescLog = fopen(parametri.logPath, "a");
-        #endif
-        // se da errore
-        if (FileDescLog == NULL) {
-            ShowErr("errore nell'aprire il file");
-        }
+
+        Fopen(&FileDescLog, parametri.logPath, "a");
     }
 }
 
@@ -1210,12 +1199,8 @@ int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
         return 1;
     }
     FILE* _f;
-#ifdef _WIN32
-    fopen_s(&_f, path, "wb");
-#else
-    _f = fopen(path, "wb");
-#endif
-    if (_f == NULL) {
+
+    if(!Fopen(&_f, path, "wb")) {
         Send(socket_descriptor, "400", 4);
         return 1;
     }
@@ -1291,13 +1276,7 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
 
     buffer = (char*)Calloc(sizeI, sizeof(char));
 
-#ifdef _WIN32
-    fopen_s(&_f, path, "rb");
-#else
-    _f = fopen(path, "rb");
-#endif
-    if (_f == NULL) {
-        //ShowErr("Impossibile aprire file per UPLOAD");
+    if(!Fopen(&_f, path, "rb")) {
         Send(socket_descriptor, "400", 4);
         return 1;
     }

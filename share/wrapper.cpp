@@ -18,7 +18,7 @@ void* Calloc(size_t count, size_t size) {
     return _t;
 }
 
-//
+// realloc Wrapper
 void* Realloc(void* var, size_t new_size) {
 
     if (var == NULL) {
@@ -106,4 +106,25 @@ int Asprintf(char*& buffer, const char* Format, ...) {
     va_end(argptr);
 
     return n;
+}
+
+// fopen Wrapper
+bool Fopen(FILE** f, const char* FileName, const char* Mode) {
+
+    if (FileName == NULL || Mode == NULL) {
+        ShowErr("Nome file di Fopen vuoto");
+    }
+    errno = 0;
+
+#ifdef _WIN32
+    fopen_s(f, FileName, Mode);
+#else
+    *f = fopen(FileName, Mode);
+#endif
+
+    if (f == NULL || errno) {
+        return false;
+    }
+
+    return true;
 }

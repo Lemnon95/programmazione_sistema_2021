@@ -430,14 +430,8 @@ void SharedLibClient::DOWLOAD() {
 
     FILE* _f = NULL;
 
-#ifdef _WIN32
-    fopen_s(&_f, this->parametri.download.src, "rb");
-#else
-    _f = fopen(this->parametri.download.src, "rb");
-#endif
-    if (_f == NULL) {
-        ShowErr("Impossibile aprire file per DOWNLOAD");
-    }
+    Fopen(&_f, this->parametri.download.src, "rb");
+
 
     // può riempie ram
 #ifdef _WIN32
@@ -460,15 +454,8 @@ void SharedLibClient::UPLOAD() {
     }
 
     FILE* _f;
-#ifdef _WIN32
-    fopen_s(&_f, this->parametri.upload.dest, "wb");
-#else
-    _f = fopen(this->parametri.upload.dest, "wb");
-#endif
-    if (_f == NULL) {
-        ShowErr("Impossibile aprire file in UPLOAD");
-    }
 
+    Fopen(&_f, this->parametri.upload.dest, "wb");
 
     char status[4] = {0};
 
