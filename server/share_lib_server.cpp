@@ -662,12 +662,7 @@ void* Accept(void* rank) {
         GestioneComandi(socket_descriptor, Tpid);
         closesocket(socket_descriptor);
     }
-    // TODO: eliminare?
-#ifdef __linux__
-    chiusura++;
-    pid_t x = syscall(__NR_gettid);
-    printf("Exit Thread number: %d\n", x);
-#endif
+    
 
     return NULL;
 }
@@ -1161,16 +1156,16 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         }
 
         // sort <path>
-        if (!std::filesystem::exists(_t)) {
+        /*if (!std::filesystem::exists(_t)) {
             Send(socket_descriptor, "400",4);
             return 1;
-        }
+        }*/
 
         // sort <dir>
-        if (std::filesystem::is_directory(_t)) {
+        /*if (std::filesystem::is_directory(_t)) {
             Send(socket_descriptor, "400",4);
             return 1;
-        }
+        }*/
 
         _bufferLen = Asprintf(buffer, "sort %s", _t);
 
@@ -1330,14 +1325,8 @@ char* _exec(const char* cmd) {
 
     if (i != 0) {
         Free(result, strlen(result));
-
-        char* _t = (char*)Calloc(100, sizeof(char));
-#ifdef _WIN32
-        sprintf_s(_t, 100, "%d", i);
-#else
-        sprintf(_t, "%d", i);
-#endif
-        return _t;
+        result = NULL;
+        Asprintf(result, "%d", i);
     }
 
 #ifdef _WIN32
@@ -1471,25 +1460,6 @@ int ReadAll(SOCKET soc, char*& ans) {
     Free(buffer_recv);
 
     return len_ans;
-}
-
-// riceve fino a riempire il buffer
-int ReadMax(SOCKET soc, char*& ans, unsigned long long BufferMaxLen) {
-
-    if (ans != NULL) {
-        ShowErr("Passare a ReadAll un puntatore nullo");
-    }
-
-    //char* buffer_recv = (char*)Calloc(128, sizeof(char));
-    ans = (char*)Calloc(BufferMaxLen, sizeof(char));
-    int len_ans = 1;
-
-    len_ans = recv(soc, ans, BufferMaxLen, MSG_WAITALL);
-
-    //Free(buffer_recv);
-
-    return len_ans;
-
 }
 
 // ricevo e scrivo su file

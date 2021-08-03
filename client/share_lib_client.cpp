@@ -653,49 +653,6 @@ int SharedLibClient::ReadAll(char*& ans){
     return len_ans;
 }
 
-// riceve fino a riempire il buffer
-int SharedLibClient::ReadMax(char*& ans, unsigned long long BufferMaxLen) {
-
-    if (ans != NULL) {
-        ShowErr("Passare a ReadAll un puntatore nullo");
-    }
-
-    char* buffer_recv = (char*)Calloc(128, sizeof(char));
-    ans = (char*)Calloc(1, sizeof(char));
-    int len_ans = 1, len = 0;
-
-    /*
-    buffer lungo effettivamente 128, ma leggo solo 127 byte, l'ultimo sarà \0
-    */
-    while ((len = recv(this->socketClient, buffer_recv, 127, 0)) > 0) { // buffer_recv avrà \0 alla fine
-
-        if (len != strlen(buffer_recv)) {
-            len = strlen(buffer_recv);
-        }
-
-        ans = (char*)Realloc(ans, len_ans + len);
-
-#ifdef _WIN32
-        strcat_s(ans, len_ans + len, buffer_recv);
-#else
-        strcat(ans, buffer_recv);
-#endif
-
-        // clean up
-        memset(buffer_recv, '\0', len);
-        len_ans += len;
-
-        if (len_ans+1 >= BufferMaxLen) {
-            break;
-        }
-    }
-
-    Free(buffer_recv);
-
-    return len_ans;
-
-}
-
 // ricevo e scrivo su file
 int SharedLibClient::RecvWriteF(FILE* _f, unsigned long long BufferMaxLen) {
     if (_f == NULL) {

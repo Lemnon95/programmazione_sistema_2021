@@ -76,7 +76,6 @@ private:
 	void SendAll(const char* str, unsigned long long bufferMaxLen);
 	int  Recv(char* _return, unsigned long long bufferMaxLen);
 	int  ReadAll(char*& ans);
-	int  ReadMax(char*& ans, unsigned long long BufferMaxLen);
 	int  RecvWriteF(FILE* _f, unsigned long long BufferMaxLen);
 
 	bool _endingSequence(char* buffer, unsigned long long size);
