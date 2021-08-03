@@ -952,13 +952,14 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             return 1;
         }
 
+
         std::error_code err;
 
         // copy path1 path2  ||  copy path1 path2 dir1
         for (int k = 0; k < i-1; k++) {
             if (std::filesystem::exists(list[k]) ){
                 // effettua la copia del file
-                std::filesystem::copy(list[k], list[i - 1], std::filesystem::copy_options::skip_existing, err);
+                std::filesystem::copy(list[k], list[i - 1], err);
                 if (err.value() != 0) {
                     // se la copia va male passa al successivo
                     Free(list[k], strlen(list[k]));
