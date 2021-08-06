@@ -1155,18 +1155,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             return 1;
         }
 
-        // sort <path>
-        /*if (!std::filesystem::exists(_t)) {
-            Send(socket_descriptor, "400",4);
-            return 1;
-        }*/
-
-        // sort <dir>
-        /*if (std::filesystem::is_directory(_t)) {
-            Send(socket_descriptor, "400",4);
-            return 1;
-        }*/
-
+        
         _bufferLen = Asprintf(buffer, "sort %s", _t);
 
 
@@ -1174,11 +1163,11 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result, strlen(result));
         Free(buffer, _bufferLen);
-
+        Free(result, strlen(result));
     }
 
 
-    //Free(result);
+    
     return 0;
 }
 
