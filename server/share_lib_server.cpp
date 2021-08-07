@@ -1034,10 +1034,9 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         for (int k = 0; k < i; k++) {
             if (std::filesystem::exists(list[k])) {
                 if (!std::filesystem::remove(list[k])) {
+                    // se la cancellazione fallisce passa al successivo
                     Free(list[k]);
-                    Free(list);
-                    Send(socket_descriptor, "400",4);
-                    return 1;
+                    continue;
                 }
 
                 int _bufferLen = Asprintf(buffer, "%s\r\n", list[k]);
@@ -1097,12 +1096,10 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         strcat(result, user->pw_name);
 #endif
 
-
-        result = (char*)Realloc(result, strlen(result) + sizeof("\r\n \r\n.\r\n"));
+        result = (char*)Realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
         
-
 #ifdef _WIN32
-        strcat_s(result, strlen(result) + sizeof("\r\n \r\n.\r\n"), "\r\n \r\n.\r\n");
+        strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
 #else
         strcat(result, " \r\n.\r\n");
 #endif
