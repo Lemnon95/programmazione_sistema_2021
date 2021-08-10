@@ -860,7 +860,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
 #endif
 
         records = (char*)Realloc(records, (_recordsLen + _bufferLen));
-
+        errno = 0;
         #ifdef _WIN32
         strcat_s(records, _recordsLen + _bufferLen, buffer);
         if (errno) ShowErr("Errore in strcat dentro LSF");
