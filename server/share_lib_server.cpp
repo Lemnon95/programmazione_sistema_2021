@@ -1146,7 +1146,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
     if (strcmp(command, "sort") == 0) {
         char* _t = NULL, *buffer = NULL;
         int _bufferLen = 0;
-        int _resultLen = 0;
+        int _resultLen = 1;
 
         // sort
         if ((_t = strtok_r(NULL, " ", &fin)) == NULL) {
@@ -1163,16 +1163,19 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         if (code != 0) {
             if (result != NULL) {
                 Free(result, _resultLen);
-                char* result = NULL;
+                char* result;
+                
             }
+            result = NULL;
             _resultLen = Asprintf(result, "%d", code);
         }
-
+        result = (char*)Realloc(result, _resultLen+sizeof(" \r\n.\r\n"));
 #ifdef _WIN32
         strcat_s(result, _resultLen + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
 #else
         strncat(result, " \r\n.\r\n", sizeof(" \r\n.\r\n"));
 #endif
+        _resultLen += sizeof(" \r\n.\r\n");
 
         Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result, strlen(result));
@@ -1299,7 +1302,7 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
     return 0;
 }
 
-int _exec(const char* cmd, char* result, int &_resultLen) {
+int _exec(const char* cmd, char*& result, int &_resultLen) {
 
     FILE* pipe = popen(cmd, "r");
     if (!pipe) ShowErr("popen() failed!");

