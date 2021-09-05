@@ -65,7 +65,6 @@ void Free(void* arg, size_t size) {
         memset(arg, '\0', size);
     }
 
-
     free(arg);
 
 }

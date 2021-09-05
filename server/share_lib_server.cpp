@@ -913,8 +913,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
     // copy
     if (strcmp(command, "copy") == 0) {
         int i = 0;
-        char* _t = NULL, *buffer = NULL;
-        int _bufferLen = 0;
+        char* _t = NULL;
         char** list = (char**)Calloc(1, sizeof(char*)); // lista di stringhe
 
         result = (char*)Calloc(1, sizeof(char));
@@ -964,9 +963,10 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                     Free(list[k], strlen(list[k]));
                     continue;
                 }
-
+                // il free alla fine riempie il buffer, ridichiaro il buffer
+                char*buffer = NULL;
                 // componi la stringa
-                _bufferLen = Asprintf(buffer, "%s\r\n", list[k]);
+                int _bufferLen = Asprintf(buffer, "%s\r\n", list[k]);
 
                 result = (char*)Realloc(result, (_resultLen + _bufferLen));
 
@@ -1038,7 +1038,8 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                     Free(list[k]);
                     continue;
                 }
-
+                // il free alla fine riempie il buffer, ridichiaro il buffer
+                char* buffer = NULL;
                 int _bufferLen = Asprintf(buffer, "%s\r\n", list[k]);
 
                 result = (char*)Realloc(result, (strlen(result) + _bufferLen));
@@ -1145,6 +1146,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
     if (strcmp(command, "sort") == 0) {
         char* _t = NULL, *buffer = NULL;
         int _bufferLen = 0;
+        int _resultLen = 0;
 
         // sort
         if ((_t = strtok_r(NULL, " ", &fin)) == NULL) {
@@ -1156,11 +1158,26 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         _bufferLen = Asprintf(buffer, "sort %s", _t);
 
 
-        result = _exec(buffer);
+        int code = _exec(buffer, result, _resultLen);
+
+        if (code != 0) {
+            if (result != NULL) {
+                Free(result, _resultLen);
+                char* result = NULL;
+            }
+            _resultLen = Asprintf(result, "%d", code);
+        }
+
+#ifdef _WIN32
+        strcat_s(result, _resultLen + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
+#else
+        strncat(result, " \r\n.\r\n", sizeof(" \r\n.\r\n"));
+#endif
+
         Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result, strlen(result));
         Free(buffer, _bufferLen);
-        Free(result, strlen(result));
+        Free(result, _resultLen);
     }
 
 
@@ -1282,25 +1299,26 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
     return 0;
 }
 
-char* _exec(const char* cmd) {
+int _exec(const char* cmd, char* result, int &_resultLen) {
 
     FILE* pipe = popen(cmd, "r");
     if (!pipe) ShowErr("popen() failed!");
 
     char buffer[128] = {0};
-    char* result = (char*)Calloc(1, sizeof(char));
+    result = (char*)Calloc(1, sizeof(char));
 
     try {
         while (fgets(buffer, sizeof(buffer)-1, pipe) != NULL) {
 
-            result = (char*)Realloc(result, strlen(result)+strlen(buffer)+1 );
+            result = (char*)Realloc(result, _resultLen +strlen(buffer) );
             
 #ifdef _WIN32
-            strcat_s(result, strlen(result) + strlen(buffer) + 1, buffer);
+            strcat_s(result, _resultLen + strlen(buffer), buffer);
 #else
             strcat(result, buffer);
 #endif
 
+            _resultLen += strlen(buffer);
 
         }
     }
@@ -1309,19 +1327,7 @@ char* _exec(const char* cmd) {
     }
     int i = pclose(pipe);
 
-    if (i != 0) {
-        Free(result, strlen(result));
-        result = NULL;
-        Asprintf(result, "%d", i);
-    }
-
-#ifdef _WIN32
-    strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
-#else
-    strncat(result, " \r\n.\r\n", sizeof(" \r\n.\r\n") );
-#endif
-
-    return result;
+    return i;
 }
 
 //////////////////////////////////////////////////////////////////////////////////
