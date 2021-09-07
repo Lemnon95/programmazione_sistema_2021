@@ -311,7 +311,7 @@ unsigned long int hashToken(char* token) {
     // bisogna basarci solo sull'input
     // e/o valori costanti
     for (int i = 0; i < strlen(token); ++i)
-        k += q + token[i] * (i+1);
+        k += q + int(token[i]) * (i+1);
 
     return k;
 }
@@ -1029,15 +1029,21 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             return 1;
         }
 
+        std::error_code err;
 
         // remove <...>
         for (int k = 0; k < i; k++) {
             if (std::filesystem::exists(list[k])) {
-                if (!std::filesystem::remove(list[k])) {
+                if (!std::filesystem::remove(list[k], err)) {
                     // se la cancellazione fallisce passa al successivo
                     Free(list[k]);
                     continue;
                 }
+
+#ifdef _DEBUG
+                printf("error code remove %d", err.value());
+#endif // _DEBUG
+
                 // il free alla fine riempie il buffer, ridichiaro il buffer
                 char* buffer = NULL;
                 int _bufferLen = Asprintf(buffer, "%s\r\n", list[k]);
