@@ -5,7 +5,7 @@ DEBUG=-g -O0 -D _DEBUG
 RELESE=-O2
 
 
-all: compileDEBUG run
+all: compile run
 #all: compile
 
 
