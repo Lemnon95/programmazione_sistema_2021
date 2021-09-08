@@ -147,17 +147,9 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end=0);
 int UPLOAD(SOCKET socket_descriptor, char* cmd);
 int _exec(const char* cmd, char*& result, int &_resultLen);
 
-// send-recv Wrapper
-void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen);
-void Send(SOCKET soc, const char* str, unsigned long long bufferMaxLen);
-int Recv(SOCKET soc, char* _return, unsigned long long bufferMaxLen);
-int ReadAll(SOCKET soc, char*& ans);
-int RecvWriteF(SOCKET soc, FILE* _f, unsigned long long BufferMaxLen);
-
 ////////////////////////////////////////////////////////////////////////////////////
 
 void Enqueue(SOCKET  socket_descriptor, Queue** front, Queue** rear);
 int  Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear);
 
 
-bool _endingSequence(char* buffer, unsigned long long size);

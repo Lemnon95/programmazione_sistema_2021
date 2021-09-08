@@ -72,11 +72,4 @@ private:
 	void DOWLOAD();
 	void UPLOAD();
 
-	void Send(const char* str, unsigned long long bufferMaxLen);
-	void SendAll(const char* str, unsigned long long bufferMaxLen);
-	int  Recv(char* _return, unsigned long long bufferMaxLen);
-	int  ReadAll(char*& ans);
-	int  RecvWriteF(FILE* _f, unsigned long long BufferMaxLen);
-
-	bool _endingSequence(char* buffer, unsigned long long size);
 };

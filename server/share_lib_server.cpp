@@ -842,7 +842,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
         if (p.is_directory()) continue;
 
         std::filesystem::path file = p.path();
-        unsigned long long size = std::filesystem::file_size(file, err);
+        size_t size = std::filesystem::file_size(file, err);
         if (err.value() != 0) continue;
 
         // NON rimpiazzare con il wrapper Asprintf
@@ -1198,6 +1198,8 @@ int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
     char* path = NULL, * size = NULL, *Pend = NULL;
     char* endP = NULL;
 
+    std::error_code err;
+
     if ((path = strtok_r(cmd, ";", &Pend)) == NULL) {
         Send(socket_descriptor, "400",4);
         return 1;
@@ -1206,7 +1208,7 @@ int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
         Send(socket_descriptor, "400",4);
         return 1;
     }
-    if (std::filesystem::exists(path)) {
+    if (std::filesystem::exists(path, err)) {
         Send(socket_descriptor, "400",4);
         return 1;
     }
@@ -1217,7 +1219,7 @@ int DOWNLOAD(SOCKET socket_descriptor, char* cmd) {
         return 1;
     }
 
-    unsigned long long sizeI = strtoull(size, &endP, 10);
+    size_t sizeI = strtoull(size, &endP, 10);
     Send(socket_descriptor, "300", 4);
 
     RecvWriteF(socket_descriptor, _f, sizeI);
@@ -1241,10 +1243,11 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
         return 1;
     }
 
+    err.clear();
 
     char* buffer = NULL;
     int _bufferLen = 0;
-    unsigned long long size = std::filesystem::file_size(path, err);
+    size_t size = std::filesystem::file_size(path, err);
     if (err.value() != 0) {
         Send(socket_descriptor, "400",4);
         return 1;
@@ -1264,7 +1267,8 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
     char* path = NULL, * size = NULL, * Pend = NULL;
     char* PendLU = NULL, *buffer = NULL;
     FILE* _f = NULL;
-    unsigned long long sizeI;
+    size_t sizeI;
+    std::error_code err;
 
     if ((path = strtok_r(cmd, ";", &Pend)) == NULL) {
         Send(socket_descriptor, "400",4);
@@ -1277,34 +1281,27 @@ int UPLOAD(SOCKET socket_descriptor, char* cmd) {
 
     sizeI = strtoull(size, &PendLU, 10);
 
-    if (!std::filesystem::exists(path)) {
+    if (!std::filesystem::exists(path,err)) {
         Send(socket_descriptor, "400",4);
         return 1;
     }
-    if (sizeI > std::filesystem::file_size(path)) {
+    err.clear();
+    size_t Fsize = std::filesystem::file_size(path,err);
+    if (sizeI > Fsize) {
         Send(socket_descriptor, "400",4);
         return 1;
     }
-
-    buffer = (char*)Calloc(sizeI, sizeof(char));
 
     if(!Fopen(&_f, path, "rb")) {
         Send(socket_descriptor, "400", 4);
         return 1;
     }
 
-#ifdef _WIN32
-    fread_s(buffer, sizeI, 1, sizeI, _f);
-#else
-    fread(buffer, 1, sizeI, _f);
-#endif
+    Send(socket_descriptor, "300", 4);
+    SendReadF(socket_descriptor, _f, sizeI);
 
     fclose(_f);
 
-
-    Send(socket_descriptor, "300", 4);
-    SendAll(socket_descriptor, buffer, sizeI);
-    Free(buffer);
     return 0;
 }
 
@@ -1338,160 +1335,6 @@ int _exec(const char* cmd, char*& result, int &_resultLen) {
 
     return i;
 }
-
-//////////////////////////////////////////////////////////////////////////////////
-
-// invia in blocco il buffer
-// da errore se il buffer è troppo grande
-void Send(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
-
-    if (str == NULL) {
-        return;
-    }
-    if (bufferMaxLen == 0) {
-        return;
-    }
-
-    if (send(soc, str, bufferMaxLen, 0) < 0) {
-        ShowErr("Errore nell'inviare un messaggio verso il server");
-    }
-}
-
-// invia blocchi da 1024
-void SendAll(SOCKET soc, const char* str, unsigned long long bufferMaxLen) {
-    if (soc <= 0) return;
-    if (str == NULL) return;
-
-    char* buffer = (char*)Calloc(1024, sizeof(char));
-
-    for (int i = 0; i < bufferMaxLen; i += 1024) {
-        memset(buffer, '\0', 1024);
-
-        if (i + 1024 > bufferMaxLen) {
-            memcpy(buffer, str + i, bufferMaxLen - i);
-            Send(soc, buffer, bufferMaxLen - i);
-        }
-        else {
-            memcpy(buffer, str + i, 1024);
-            Send(soc, buffer, 1024);
-        }
-
-
-    }
-
-    Free(buffer, 1024);
-}
-
-// riceve finchè non trova \0
-int Recv(SOCKET soc, char* _return, unsigned long long bufferMaxLen) {
-    if (bufferMaxLen == 0) {
-        return -1;
-    }
-    if (_return == NULL) {
-        return -1;
-    }
-    int len = 0;
-    int max = bufferMaxLen;
-    char* moreBuf = NULL;
-
-    if ((len = recv(soc, _return, bufferMaxLen, 0)) <= 0) {
-        //ShowErr("Errore nel ricevere un messaggio dal client");
-        return -1;
-    }
-
-    if (_return[max - 1] != '\0') {
-
-        moreBuf = (char*)Calloc(bufferMaxLen, sizeof(char));
-
-        while (_return[max - 1] != '\0') {
-
-            if ((len = recv(soc, moreBuf, bufferMaxLen, 0)) <= 0) {
-                //ShowErr("Errore nel ricevere un messaggio dal client");
-                return -1;
-            }
-
-            _return = (char*)Realloc(_return, max + len);
-            memcpy(_return + max, moreBuf, len);
-            max += len;
-        }
-        Free(moreBuf, bufferMaxLen);
-    }
-
-
-    return max;
-}
-
-// riceve fino alla seguenza " \r\n.\r\n"
-int ReadAll(SOCKET soc, char*& ans) {
-
-    if (ans != NULL) {
-        ShowErr("Passare a ReadAll un puntatore nullo");
-    }
-
-    char* buffer_recv = (char*)Calloc(128, sizeof(char));
-    ans = (char*)Calloc(1, sizeof(char));
-    int len_ans = 1, len = 0;
-
-    /*
-    buffer lungo effettivamente 128, ma leggo solo 127 byte, l'ultimo sarà \0
-    */
-    while ((len = recv(soc, buffer_recv, 127, 0)) > 0) { // buffer_recv avrà \0 alla fine
-
-        if (len != strlen(buffer_recv)) {
-            len = strlen(buffer_recv);
-        }
-
-        ans = (char*)Realloc(ans, len_ans + len);
-
-#ifdef _WIN32
-        strcat_s(ans, len_ans + len, buffer_recv);
-#else
-        strcat(ans, buffer_recv);
-#endif
-
-        // clean up
-        memset(buffer_recv, '\0', len);
-        len_ans += len;
-
-        if (_endingSequence(ans, len_ans)) {
-            break;
-        }
-    }
-
-    Free(buffer_recv);
-
-    return len_ans;
-}
-
-// ricevo e scrivo su file
-int RecvWriteF(SOCKET soc, FILE* _f, unsigned long long BufferMaxLen) {
-    if (_f == NULL) {
-        ShowErr("passare un file aperto a RecvWriteF");
-    }
-
-    char* buffer_recv = (char*)Calloc(128, sizeof(char));
-    int len_ans = 1, len = 0;
-
-    // mentre ricevo dati dal socket, scrivo sul file
-    while ((len = recv(soc, buffer_recv, 128, 0)) > 0) { // buffer_recv avrà \0 alla fine
-
-        fwrite(buffer_recv, 1, len, _f);
-
-        // clean up
-        memset(buffer_recv, '\0', len);
-        len_ans += len;
-
-        if (len_ans + 1 >= BufferMaxLen) {
-            break;
-        }
-    }
-
-    Free(buffer_recv, 128);
-
-    return len_ans;
-
-}
-
 
 //////////////////////////////////////////////////////////////////////////////////
 // funzioni per gestire la pila di socket
@@ -1536,18 +1379,4 @@ int Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear) {
     size--;
     free(temp);
     return 0;
-}
-
-
-bool _endingSequence(char* buffer, unsigned long long size) {
-    char sequence[7] = " \r\n.\r\n"; // conto anche \0
-    if (size < 7) {
-        return false;
-    }
-
-    if (strncmp(buffer + size - 7, sequence, 7) == 0) {
-        return true;
-    }
-
-    return false;
 }

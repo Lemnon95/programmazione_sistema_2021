@@ -7,7 +7,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
     this->parametri = { {AF_INET, 8888, {0}}, NULL, NULL, {NULL, 0}, {NULL, 0} };
 
     // parsing argomenti
-    unsigned long long maxArg = argc;
+    size_t maxArg = argc;
     while (argc > 0) {
 
         argc -= 1;
@@ -248,7 +248,7 @@ unsigned long int SharedLibClient::hashToken(char* token) {
     // no fattori di tempo
     // bisogna basarci solo sull'input
     // e/o valori costanti
-    for (int i = 0; i < strlen(token); ++i)
+    for (size_t i = 0; i < strlen(token); ++i)
         k += q + token[i] * (i + 1);
 
     return k;
@@ -281,8 +281,8 @@ void SharedLibClient::Trasmissione() {
     */
 
     // passo 1,2 //////////////////////////////////////////////////
-    this->Send("HELO", 5); // invio HELO
-    this->Recv(status, 4); // ricevo lo status
+    Send(this->socketClient, "HELO", 5); // invio HELO
+    Recv(this->socketClient, status, 4); // ricevo lo status
 
     // controllo lo status ottenuto se è ok
     if (strncmp(status, "300", 3) != 0) {
@@ -292,7 +292,7 @@ void SharedLibClient::Trasmissione() {
     memset(status, '\0', 4); // pulisco lo status
 
 
-    if ((_recvChallengeLen = this->Recv(recv_Challenge, 11)) <= 0) {
+    if ((_recvChallengeLen = Recv(this->socketClient, recv_Challenge, 11)) <= 0) {
         ShowErr("Errore nel ricevere la challenge dal server");
     } // ricevo la challenge
     challenge = strtoul(recv_Challenge, &endP, 10); // strasformo la challenge
@@ -311,8 +311,8 @@ void SharedLibClient::Trasmissione() {
     ///////////////////////////////////////////////////////////////
 
     // passo 6 ////////////////////////////////////////////////////
-    this->Send(authmsg, _authMsgLen);
-    this->Recv(status, 4);
+    Send(this->socketClient, authmsg, _authMsgLen);
+    Recv(this->socketClient, status, 4);
 
     Free(authmsg, _authMsgLen);
     if (strncmp(status, "200", 3) != 0) { // Error
@@ -352,8 +352,8 @@ void SharedLibClient::LSF(){
 
     _commandLen = Asprintf(command, "LSF %s", this->parametri.lsf);
 
-    this->Send(command, _commandLen);
-    this->Recv(status, 4);
+    Send(this->socketClient, command, _commandLen);
+    Recv(this->socketClient, status, 4);
 
     Free(command, _commandLen);
 
@@ -363,7 +363,7 @@ void SharedLibClient::LSF(){
         return;
     }
 
-    _ansLen = this->ReadAll(ans);
+    _ansLen = ReadAll(this->socketClient, ans);
 
     printf("\n%s\n", ans);
     Free(ans, _ansLen);
@@ -381,8 +381,8 @@ void SharedLibClient::EXEC() {
 
     _commandLen = Asprintf(command, "EXEC %s", this->parametri.exec);
 
-    this->Send(command, _commandLen);
-    this->Recv(status, 4);
+    Send(this->socketClient, command, _commandLen);
+    Recv(this->socketClient, status, 4);
 
     Free(command, _commandLen);
     if (strncmp(status, "300", 3) != 0) {
@@ -390,7 +390,7 @@ void SharedLibClient::EXEC() {
         return;
     }
 
-    _ansLen = this->ReadAll(ans);
+    _ansLen = ReadAll(this->socketClient, ans);
 
     printf("\n%s\n", ans);
     Free(ans, _ansLen);
@@ -412,13 +412,13 @@ void SharedLibClient::DOWLOAD() {
     char* command = NULL;
     int _commandLen = 0;
 
-    unsigned long long sizeI = std::filesystem::file_size(this->parametri.download.src);
+    size_t sizeI = std::filesystem::file_size(this->parametri.download.src);
 
 
     _commandLen = Asprintf(command, "DOWNLOAD %s;%llu", this->parametri.download.dest, sizeI);
 
-    this->Send(command, _commandLen);
-    this->Recv(status, 4);
+    Send(this->socketClient, command, _commandLen);
+    Recv(this->socketClient, status, 4);
 
     Free(command, _commandLen);
     if (strncmp(status, "300", 3) != 0) {
@@ -426,23 +426,13 @@ void SharedLibClient::DOWLOAD() {
         return;
     }
 
-    char* buffer = (char*)Calloc(sizeI, sizeof(char));
-
     FILE* _f = NULL;
 
     Fopen(&_f, this->parametri.download.src, "rb");
 
-
-    // può riempie ram
-#ifdef _WIN32
-    fread_s(buffer, sizeI, 1, sizeI, _f);
-#else
-    fread(buffer, 1, sizeI, _f);
-#endif
+    SendReadF(this->socketClient, _f, sizeI);
 
     fclose(_f);
-    SendAll(buffer, sizeI);
-    Free(buffer);
 }
 
 void SharedLibClient::UPLOAD() {
@@ -470,15 +460,15 @@ void SharedLibClient::UPLOAD() {
 
     char* endP = NULL;
 
-    unsigned long long sizeI;
+    size_t sizeI;
 
 
     // Invio SIZE per sapere la dimensione del file
     _sizeCmdLen = Asprintf(sizeCmd, "SIZE %s", this->parametri.upload.src);
-    this->Send(sizeCmd, _sizeCmdLen);
+    Send(this->socketClient, sizeCmd, _sizeCmdLen);
     Free(sizeCmd, _sizeCmdLen);
     // se percorso esiste allora 300
-    this->Recv(status, 4);
+    Recv(this->socketClient, status, 4);
     if (strncmp(status, "300", 3) != 0) {
         Free(status, 4);
         printf("Errore da parte del server nell'eseguire SIZE\n");
@@ -487,7 +477,7 @@ void SharedLibClient::UPLOAD() {
 
     // ottengo il peso del file
     size = (char*)Calloc(128, sizeof(char));
-    _sizeLen = this->Recv(size, 128);
+    _sizeLen = Recv(this->socketClient, size, 128);
 
     // peso del file in fomrato integer
     sizeI = strtoull(size, &endP, 10);
@@ -499,8 +489,8 @@ void SharedLibClient::UPLOAD() {
 
     _commandLen = Asprintf(command, "UPLOAD %s;%llu", this->parametri.upload.src, sizeI);
 
-    this->Send(command, _commandLen);
-    this->Recv(status, 4);
+    Send(this->socketClient, command, _commandLen);
+    Recv(this->socketClient, status, 4);
 
     Free(command, _commandLen);
 
@@ -510,176 +500,9 @@ void SharedLibClient::UPLOAD() {
     }
 
 
-    RecvWriteF(_f, sizeI);
-
-    // riempie ram
-    // leggo al massimo sizeI caratteri (o byte)
-    //_ansLen = this->ReadMax(ans, sizeI);
-
-
-    // tolgo un \0 alla fine dell'array
-    //fwrite(ans, 1, _ansLen-1, _f);
+    RecvWriteF(this->socketClient, _f, sizeI);
 
     fclose(_f);
-    //Free(ans, _ansLen);
-}
-
-///////////////////////////////////////
-
-// invia in blocco il buffer
-// da errore se il buffer è troppo grande
-void SharedLibClient::Send(const char* str, unsigned long long bufferMaxLen) {
-
-    if (str == NULL) {
-        return;
-    }
-    if (bufferMaxLen == 0) {
-        return;
-    }
-    if ((send(this->socketClient, str, bufferMaxLen, 0)) <= 0) {
-        ShowErr("Errore nell'inviare un messaggio verso il server");
-    }
-
-}
-
-// invia blocchi da 1024
-void SharedLibClient::SendAll(const char* str, unsigned long long bufferMaxLen) {
-    if (this->socketClient <= 0) return;
-    if (str == NULL) return;
-
-    char* buffer = (char*)Calloc(1024, sizeof(char));
-
-    // itero sulla size del buffer
-    for (int i = 0; i < bufferMaxLen; i += 1024) {
-        memset(buffer, '\0', 1024);
-
-        // se rimane meno di 1024 byte nel buffer da inviare
-        if (i + 1024 > bufferMaxLen) {
-            // invia i rimanenti
-            memcpy(buffer, str + i, bufferMaxLen - i);
-            Send(buffer, bufferMaxLen - i);
-        }
-        else {
-            // invia tutti i 1024
-            memcpy(buffer, str + i, 1024);
-            Send(buffer, 1024);
-        }
-
-
-    }
-
-    Free(buffer, 1024);
-}
-
-// riceve finchè non trova \0
-int SharedLibClient::Recv(char* _return, unsigned long long bufferMaxLen) {
-    if (bufferMaxLen == 0) {
-        return -1;
-    }
-    if (_return == NULL) {
-        return -1;
-    }
-    int len = 0;
-    int max = bufferMaxLen;
-    char* moreBuf = NULL;
-
-    if ((len = recv(this->socketClient, _return, bufferMaxLen, 0)) <= 0) {
-        //ShowErr("Errore nel ricevere un messaggio dal client");
-        return -1;
-    }
-
-    if (_return[max - 1] != '\0') {
-
-        moreBuf = (char*)Calloc(bufferMaxLen, sizeof(char));
-
-        while (_return[max - 1] != '\0') {
-
-            if ((len = recv(this->socketClient, moreBuf, bufferMaxLen, 0)) <= 0) {
-                //ShowErr("Errore nel ricevere un messaggio dal client");
-                return -1;
-            }
-
-            _return = (char*)Realloc(_return, max + len);
-            memcpy(_return + max, moreBuf, len);
-            max += len;
-        }
-        Free(moreBuf, bufferMaxLen);
-    }
-
-
-    return max;
-
-}
-
-// riceve fino alla seguenza " \r\n.\r\n"
-int SharedLibClient::ReadAll(char*& ans){
-
-    if (ans != NULL) {
-        ShowErr("Passare a ReadAll un puntatore nullo");
-    }
-
-    char* buffer_recv = (char*)Calloc(128, sizeof(char));
-    ans = (char*)Calloc(1, sizeof(char));
-    int len_ans = 1,len = 0;
-
-    /*
-    buffer lungo effettivamente 128, ma leggo solo 127 byte, l'ultimo sarà \0
-    */
-    while ((len = recv(this->socketClient, buffer_recv, 127, 0)) > 0) { // buffer_recv avrà \0 alla fine
-
-        if (len != strlen(buffer_recv)) {
-            len = strlen(buffer_recv);
-        }
-
-        ans = (char*)Realloc(ans, len_ans + len);
-
-#ifdef _WIN32
-        strcat_s(ans, len_ans + len, buffer_recv);
-#else
-        strcat(ans, buffer_recv);
-#endif
-
-        // clean up
-        memset(buffer_recv, '\0', len);
-        len_ans += len;
-
-        if (this->_endingSequence(ans, len_ans)) {
-            break;
-        }
-    }
-
-    Free(buffer_recv);
-
-    return len_ans;
-}
-
-// ricevo e scrivo su file
-int SharedLibClient::RecvWriteF(FILE* _f, unsigned long long BufferMaxLen) {
-    if (_f == NULL) {
-        ShowErr("passare un file aperto a RecvWriteF");
-    }
-
-    char* buffer_recv = (char*)Calloc(128, sizeof(char));
-    int len_ans = 1, len = 0;
-
-    // mentre ricevo dati dal socket, scrivo sul file
-    while ((len = recv(this->socketClient, buffer_recv, 128, 0)) > 0) { // buffer_recv avrà \0 alla fine
-
-        fwrite(buffer_recv, 1, len, _f);
-
-        // clean up
-        memset(buffer_recv, '\0', len);
-        len_ans += len;
-
-        if (len_ans + 1 >= BufferMaxLen) {
-            break;
-        }
-    }
-
-    Free(buffer_recv, 128);
-
-    return len_ans;
-
 }
 
 ///////////////////////////////////////
@@ -699,29 +522,4 @@ void SharedLibClient::clearSocket() {
 #ifdef _WIN32
     WSACleanup();
 #endif
-}
-
-bool SharedLibClient::_endingSequence(char* buffer, unsigned long long size) {
-    char sequence[7] = " \r\n.\r\n"; // conto anche \0
-    if (size < 7) {
-        return false;
-    }
-    /*
-    for (int i = 0; i < size - 7; i++) {
-
-        if (strncmp(buffer + i, sequence, 7) == 0) {
-            return true;
-        }
-
-    }
-    */
-
-    if (strncmp(buffer + size-7, sequence, 7) == 0) {
-        return true;
-    }
-
-
-
-
-    return false;
 }
