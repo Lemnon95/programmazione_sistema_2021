@@ -13,21 +13,18 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="shared_lib">
-      <UniqueIdentifier>{89a5e080-cf72-4c79-9cd9-aec8a7259151}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="client.cpp">
+    <ClInclude Include="share_lib_server.h">
+      <Filter>File di intestazione</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="server.cpp">
       <Filter>File di origine</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\lib\share_lib_client.cpp">
-      <Filter>shared_lib</Filter>
+    <ClCompile Include="share_lib_server.cpp">
+      <Filter>File di origine</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\lib\share_lib_client.h">
-      <Filter>shared_lib</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

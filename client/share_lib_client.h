@@ -1,9 +1,15 @@
 #pragma once
 
+#define MAX_PATH 260
+
+#include <iostream>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <string>
+#include <filesystem>
+#include <stdarg.h>
+#include "wrapper.h"
 
 #ifdef _WIN32
 #define _WINSOCKAPI_ 
@@ -25,8 +31,6 @@
 
 #endif // _WIN32
 
-#define MAX_PATH 260
-
 // parametri di configurazione
 struct params {
 	struct sockaddr_in server;
@@ -34,11 +38,11 @@ struct params {
 	char* exec;
 	struct download {
 		char* src;
-		unsigned long long size;
+		char* dest;
 	} download;
 	struct upload {
 		char* src;
-		unsigned long long size;
+		char* dest;
 	} upload;
 };
 
@@ -58,24 +62,14 @@ private:
 	void getPassphrase(const char* printText, char* passphrase);
 	unsigned long int generateToken(const char* printText);
 	unsigned long int hashToken(char* token);
-	void Send(const char* str);
-	void Recv(char* _return);
-	void Send_Recv(char* _return, const char* str = NULL, char* status = NULL);
+	
 	void Trasmissione();
 	void clearSocket();
+
 	void GestioneComandi();
 	void LSF();
 	void EXEC();
 	void DOWLOAD();
 	void UPLOAD();
-	char* ReadAll();
-};
 
-// calloc Wrapper
-void* Calloc(unsigned long int nmemb, unsigned long int size);
-// fprintf Wrapper
-void ShowErr(const char* str);
-// free Wrapper
-void Free(void* arg, int size);
-// strcpy Wrapper
-void Strcpy(char* dest, unsigned int size, const char* src);
+};

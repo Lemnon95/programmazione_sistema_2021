@@ -7,6 +7,7 @@
 #define MAX_PATH 260
 #define SERVERLISTEN "0.0.0.0"
 
+#include <iostream>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -14,7 +15,8 @@
 #include <time.h>
 #include <ctime>
 #include <filesystem>
-#include <iostream>
+#include <stdarg.h>
+#include "wrapper.h"
 
 #ifdef _WIN32
 #define _WINSOCKAPI_
@@ -30,12 +32,16 @@
 #define strtok_r strtok_s
 #define popen _popen
 #define pclose _pclose
+#define fscanf fscanf_s
 
 // win32 condition variable
 inline CONDITION_VARIABLE Threadwait;
 inline CRITICAL_SECTION CritSec;
 inline CRITICAL_SECTION FileLock;
 
+inline HANDLE* threadChild = NULL;
+inline int esci = 0;
+inline int signum=0;
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -48,11 +54,11 @@ inline CRITICAL_SECTION FileLock;
 #include <pwd.h>
 
 //dichiarazione mutex e condition variables linux
-inline pthread_mutex_t mutex;
-inline pthread_cond_t cond_var;
+inline pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+inline pthread_cond_t cond_var = PTHREAD_COND_INITIALIZER;
 inline pthread_t* threadChild = NULL;
 inline pthread_t thread_handler;
-inline bool wake_one = true;
+inline pthread_mutex_t mutex_log = PTHREAD_MUTEX_INITIALIZER;
 inline sig_atomic_t esci = 0;
 inline int chiusura = 0;
 inline int signum;
@@ -87,8 +93,8 @@ parametri opzionali:
 -l <path file>		percorso di log (default /tmp/server.log)
 */
 typedef struct _params {
-	short unsigned int port; // 0 - 65535
-	short unsigned int nthread; //0 - 65535, non più di 65534 poichè saturerebbero le porte disponibili (65535-1 dove -1 è del server stesso)
+	unsigned short int port; // 0 - 65535
+	unsigned short int nthread; //0 - 65535, non più di 65534 poichè saturerebbero le porte disponibili (65535-1 dove -1 è del server stesso)
 	char* configPath; // stringa di lunghezza variabile
 	bool printToken; // indice booleano per indicare se printare o meno il token T_s
 	char* logPath; // stringa variabile del percoso dei log
@@ -99,10 +105,8 @@ inline params parametri;
 inline unsigned long int T_s = 0;
 inline FILE* FileDescLog = NULL;
 inline SOCKET socketMaster = 0;
-#ifdef _WIN32
-inline void** threadChild = NULL;
-#endif //WIN32
 inline sockaddr_storage socketChild;
+inline bool wake_one = true;
 
 ////////////////////////////////////////////////////////////////////////////////////
 // funzioni
@@ -129,6 +133,8 @@ void closeLog();
 
 #ifdef __linux__
 void* SigHandler(void* dummy);
+#else // _WIN32
+BOOL WINAPI CtrlHandler(DWORD signal);
 #endif
 
 void* Accept(void* rank);
@@ -139,28 +145,11 @@ int EXEC(SOCKET socket_descriptor, char* cmd);
 int DOWNLOAD(SOCKET socket_descriptor, char* cmd);
 int SIZE_(SOCKET socket_descriptor, char* path, bool end=0);
 int UPLOAD(SOCKET socket_descriptor, char* cmd);
-char* _exec(const char* cmd);
-
-// send-recv Wrapper
-void SendAll(SOCKET soc, const char* str);
-void Send(SOCKET soc, const char* str);
-int Recv(SOCKET soc, char* _return);
-void Send_Recv(SOCKET soc, char* _return, const char* str = NULL, const char* status = NULL);
+int _exec(const char* cmd, char*& result, int &_resultLen);
 
 ////////////////////////////////////////////////////////////////////////////////////
 
 void Enqueue(SOCKET  socket_descriptor, Queue** front, Queue** rear);
 int  Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear);
-
-////////////////////////////////////////////////////////////////////////////////////
-
-// calloc Wrapper
-void* Calloc(unsigned long int nmemb, unsigned long int size);
-// fprintf Wrapper
-void ShowErr(const char* str);
-// free Wrapper
-void Free(void * arg, int size=0);
-// strcpy Wrapper
-void Strcpy(char* dest, unsigned int size, const char* src);
 
 

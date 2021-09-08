@@ -7,7 +7,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
     this->parametri = { {AF_INET, 8888, {0}}, NULL, NULL, {NULL, 0}, {NULL, 0} };
 
     // parsing argomenti
-    unsigned long long maxArg = argc;
+    size_t maxArg = argc;
     while (argc > 0) {
 
         argc -= 1;
@@ -91,7 +91,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
 
         }
 
-        // -d <src> <size>
+        // -d <src> <desc>
         if (strcmp(argv[argc], "-d") == 0) {
 
             if (argc + 1 >= maxArg) {
@@ -113,9 +113,8 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
             this->parametri.download.src = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
             this->parametri.download.src = argv[argc + 1];
 
-            //this->parametri.download.size = (char*)Calloc(sizeof(argv[argc + 2]) + 1, sizeof(char));
-            char* Pend = NULL;
-            this->parametri.download.size = strtoull(argv[argc + 2], &Pend, 10);
+            this->parametri.download.dest = (char*)Calloc(sizeof(argv[argc + 2]) + 1, sizeof(char));
+            this->parametri.download.dest = argv[argc + 2];
 
         }
 
@@ -141,9 +140,8 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
             this->parametri.upload.src = (char*)Calloc(sizeof(argv[argc + 1]) + 1, sizeof(char));
             this->parametri.upload.src = argv[argc + 1];
 
-            //this->parametri.upload.size = (char*)Calloc(sizeof(argv[argc + 2]) + 1, sizeof(char));
-            char* Pend = NULL;
-            this->parametri.upload.size = strtoull(argv[argc + 2], &Pend, 10);
+            this->parametri.upload.dest = (char*)Calloc(sizeof(argv[argc + 2]) + 1, sizeof(char));
+            this->parametri.upload.dest = argv[argc + 2];
 
         }
     }
@@ -152,18 +150,18 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
         ShowErr("indirizzo ip mancante (-h)");
     }
 
-
-    printf("\nserver: %d %d\nlsf: %s\nexec: %s\ndownload: %s %llu\nupload: %s %llu\n",
+#ifdef _DEBUG
+    printf("\nserver: %d %d\nlsf: %s\nexec: %s\ndownload: %s %s\nupload: %s %s\n",
         this->parametri.server.sin_addr.s_addr,
         this->parametri.server.sin_port,
         this->parametri.lsf,
         this->parametri.exec,
         this->parametri.download.src,
-        this->parametri.download.size,
+        this->parametri.download.dest,
         this->parametri.upload.src,
-        this->parametri.upload.size
+        this->parametri.upload.dest
     );
-
+#endif // DEBUG
 
 
     this->T_s = this->generateToken("Immetti passphrase del server (max 254): ");
@@ -174,7 +172,7 @@ SharedLibClient::SharedLibClient(int argc, char* argv[]) {
     printf("\nT_s: %lu\nT_c: %lu\n", this->T_s, this->T_c);
 #endif // _DEBUG
 
-    
+
 
 }
 
@@ -194,13 +192,14 @@ void SharedLibClient::Connect() {
     }
 #endif
 
+    // apri un socket TCP
     this->socketClient = socket(PF_INET, SOCK_STREAM, 0);
     if (this->socketClient < 0) {
         this->clearSocket();
         ShowErr("Errore creazione socket master");
     }
 
-
+    // tentativo di connessione al server dato
     if (connect(this->socketClient, (sockaddr*)&(this->parametri.server), sizeof(this->parametri.server)) < 0) {
         this->clearSocket();
         ShowErr("Impossibile connettersi al server");
@@ -208,25 +207,29 @@ void SharedLibClient::Connect() {
 
     // effettua la connessione ed autenticazione
     this->Trasmissione();
-    /*
-    TODO: inviare e gestire comandi passati come args
-    */
-    this->GestioneComandi();
 
-    //closesocket(this->socketClient);
+#ifdef _DEBUG
+    printf("\nConnessione OK\n");
+#endif
+
+    // invio e ricezione di più comandi
+    this->GestioneComandi();
 }
 
 void SharedLibClient::getPassphrase(const char* printText, char* passphrase) {
+    // prende in input x caratteri
     printf("%s",printText);
     fgets(passphrase, 254, stdin);
 }
 
 unsigned long int SharedLibClient::generateToken(const char* printText) {
-
+    // stringa di caratteri
     char* passphrase = (char*)Calloc(256, sizeof(char));
 
+    // ottieni l'input dell'utente, la stringa contiene 2 \0\0 finali
     this->getPassphrase(printText,passphrase);
 
+    // ottieni l'hash dalla stringa data
     unsigned long int k = this->hashToken(passphrase);
 
     // reset passphrase
@@ -236,49 +239,22 @@ unsigned long int SharedLibClient::generateToken(const char* printText) {
 }
 
 unsigned long int SharedLibClient::hashToken(char* token) {
-    
-    unsigned long int k = 5381;
+
+    int q = 5381;
+    unsigned long int k = 0;
     // hashing
     // stessa phrase stresso hash
     // no fattori randomici
     // no fattori di tempo
     // bisogna basarci solo sull'input
     // e/o valori costanti
-    for (int i = 0; i < strlen(token); ++i)
-        k = (k * 27) + token[i];
+    for (size_t i = 0; i < strlen(token); ++i)
+        k += q + token[i] * (i + 1);
 
     return k;
 }
 
-void SharedLibClient::Send(const char* str) {
 
-    if (str == NULL) {
-        return;
-    }
-
-    if (send(this->socketClient, str, 1023, 0) < 0) {
-        ShowErr("Errore nell'inviare un messaggio verso il server");
-    }
-}
-
-void SharedLibClient::Recv(char* _return) {
-    memset(_return, '\0', 1024);
-    if (recv(this->socketClient, _return, 1023, 0) < 0) {
-        ShowErr("Errore nel ricevere un messaggio dal server");
-    }
-
-}
-
-void SharedLibClient::Send_Recv(char* _return, const char* str, char* status) {
-
-    this->Send(str);
-
-    if (status != NULL) {
-        this->Recv(status);
-    }
-
-    this->Recv(_return);
-}
 
 void SharedLibClient::Trasmissione() {
 
@@ -287,11 +263,13 @@ void SharedLibClient::Trasmissione() {
     unsigned long int enc2 = 0;
     unsigned long int nonce = 0;
 
-    char* endP;
-    char status[1024] = { 0 };
-    char _t[1024] = { 0 };
-    char authmsg[1024] = { 0 };
+    int _authMsgLen = 0;
+    char* authmsg = NULL;
 
+    char* endP;
+    char status[4] = { 0 };
+    char* recv_Challenge = (char*)Calloc(11, sizeof(char)); // array della challenge
+    int _recvChallengeLen = 0;
     /*
     1. invio HELO
     2. ricevo la challenge
@@ -302,36 +280,48 @@ void SharedLibClient::Trasmissione() {
     comandi ulteriori
     */
 
-    // passo 1,2
-    this->Send_Recv(_t, "HELO", status);
-    challenge = strtoul(_t, &endP, 10);
+    // passo 1,2 //////////////////////////////////////////////////
+    Send(this->socketClient, "HELO", 5); // invio HELO
+    Recv(this->socketClient, status, 4); // ricevo lo status
 
-
+    // controllo lo status ottenuto se è ok
     if (strncmp(status, "300", 3) != 0) {
         closesocket(this->socketClient);
         ShowErr("status code invalido");
     }
-    memset(status, '\0', 1024);
+    memset(status, '\0', 4); // pulisco lo status
 
-    // passo 3
+
+    if ((_recvChallengeLen = Recv(this->socketClient, recv_Challenge, 11)) <= 0) {
+        ShowErr("Errore nel ricevere la challenge dal server");
+    } // ricevo la challenge
+    challenge = strtoul(recv_Challenge, &endP, 10); // strasformo la challenge
+    Free(recv_Challenge, _recvChallengeLen);
+    ///////////////////////////////////////////////////////////////
+
+    // passo 3 ////////////////////////////////////////////////////
     nonce = challenge ^ this->T_s; // risolvo la challenge
+    ///////////////////////////////////////////////////////////////
 
-    // passo 4,5
+    // passo 4,5 //////////////////////////////////////////////////
     enc1 = this->T_s ^ nonce ^ this->T_c;
     enc2 = this->T_c ^ nonce;
 
-    snprintf(authmsg, 1024, "AUTH %lu;%lu", enc1, enc2); // compongo AUTH enc1;enc2
+    _authMsgLen = Asprintf(authmsg, "AUTH %lu;%lu", enc1, enc2); // compongo AUTH enc1;enc2
+    ///////////////////////////////////////////////////////////////
 
-    // passo 6
-    this->Send_Recv(status, authmsg);
+    // passo 6 ////////////////////////////////////////////////////
+    Send(this->socketClient, authmsg, _authMsgLen);
+    Recv(this->socketClient, status, 4);
 
-    if (strncmp(status, "200", 3) != 0) ShowErr("Auth errato");
+    Free(authmsg, _authMsgLen);
+    if (strncmp(status, "200", 3) != 0) { // Error
+      closesocket(this->socketClient);
+      ShowErr("Auth errato");
+    }
+    ///////////////////////////////////////////////////////////////
 
-#ifdef _DEBUG
-    printf("\nConnessione OK\n");
-#endif
-
-
+    // Auth ok
 }
 
 void SharedLibClient::GestioneComandi () {
@@ -341,145 +331,186 @@ void SharedLibClient::GestioneComandi () {
   if (this->parametri.exec != NULL) {
       this->EXEC();
   }
-  if (this->parametri.download.src != NULL && this->parametri.download.size != 0 ) {
+  if (this->parametri.download.src != NULL && this->parametri.download.dest != NULL ) {
       this->DOWLOAD();
   }
-  if (this->parametri.upload.src != NULL && this->parametri.upload.size != 0) {
+  if (this->parametri.upload.src != NULL && this->parametri.upload.dest != NULL) {
       this->UPLOAD();
   }
 }
 
 void SharedLibClient::LSF(){
 
-    char* status = (char*)Calloc(1024, sizeof(char));
-    char* command = (char*)Calloc(1024, sizeof(char));
+    char status[4] = { 0 };
 
-    snprintf(command, 1024, "LSF %s", this->parametri.lsf);
+    char* command = NULL;
+    int _commandLen = 0;
 
-    this->Send_Recv(status, command);
- 
-    Free(command, 1024);
+    char* ans = NULL;
+    int _ansLen = 0;
 
+
+    _commandLen = Asprintf(command, "LSF %s", this->parametri.lsf);
+
+    Send(this->socketClient, command, _commandLen);
+    Recv(this->socketClient, status, 4);
+
+    Free(command, _commandLen);
+
+    // status del comando
     if (strncmp(status, "300", 3) != 0){
-        Free(status, 1024);
-        
         printf("Errore nell'esecuzione di LSF\n");
         return;
     }
-    Free(status, 1024);
 
-    char* ans = this->ReadAll();
+    _ansLen = ReadAll(this->socketClient, ans);
 
-    printf("%s\n", ans);
-    Free(ans, strlen(ans));
+    printf("\n%s\n", ans);
+    Free(ans, _ansLen);
 }
 
 void SharedLibClient::EXEC() {
-    char* command = (char*)Calloc(1024, sizeof(char));
-    char* status = (char*)Calloc(1024, sizeof(char));
 
-    snprintf(command, 1024, "EXEC %s", this->parametri.exec);
-    this->Send_Recv(status, command);
+    char status[4] = { 0 };
 
-    Free(command, 1024);
+    char* command = NULL;
+    int _commandLen = 0;
 
+    char* ans = NULL;
+    int _ansLen = 0;
+
+    _commandLen = Asprintf(command, "EXEC %s", this->parametri.exec);
+
+    Send(this->socketClient, command, _commandLen);
+    Recv(this->socketClient, status, 4);
+
+    Free(command, _commandLen);
     if (strncmp(status, "300", 3) != 0) {
-        Free(status, 1024);
         printf("Errore nell'esecuzione di EXEC\n");
         return;
     }
-    Free(status, 1024);
 
-    char* ans = this->ReadAll();
+    _ansLen = ReadAll(this->socketClient, ans);
 
     printf("\n%s\n", ans);
+    Free(ans, _ansLen);
 }
 
 void SharedLibClient::DOWLOAD() {
-    char* command = (char*)Calloc(1024, sizeof(char));
-    char* status = (char*)Calloc(1024, sizeof(char));
+    // download lato server
+    // upload lato client
 
-#ifdef WIN32
-    sprintf_s(command, 1023, "DOWNLOAD %s;%llu", this->parametri.download.src, this->parametri.download.size);
-#else
-    snprintf(command, 1023, "DOWNLOAD %s;%llu", this->parametri.download.src, this->parametri.download.size);
-#endif
+    if (!std::filesystem::exists(this->parametri.download.src)) {
+        ShowErr("file inserito per il download non presente");
+    }
+    if (std::filesystem::is_directory(this->parametri.download.src)) {
+        ShowErr("non puoi caricare una directory");
+    }
 
-    this->Send_Recv(status, command);
+    char status[4] = { 0 };
 
-    Free(command, strlen(command));
+    char* command = NULL;
+    int _commandLen = 0;
 
+    size_t sizeI = std::filesystem::file_size(this->parametri.download.src);
+
+
+    _commandLen = Asprintf(command, "DOWNLOAD %s;%llu", this->parametri.download.dest, sizeI);
+
+    Send(this->socketClient, command, _commandLen);
+    Recv(this->socketClient, status, 4);
+
+    Free(command, _commandLen);
     if (strncmp(status, "300", 3) != 0) {
-        Free(status, 1024);
-
-        printf("Errore nell'esecuzione di DOWLOAD\n");
+        printf("Errore ricevuto dal server\n");
         return;
     }
-    Free(status, 1024);
 
-    //char* ans = this->ReadAll();
+    FILE* _f = NULL;
 
-    //printf("%s\n", ans);
-    //Free(ans, strlen(ans));
+    Fopen(&_f, this->parametri.download.src, "rb");
 
+    SendReadF(this->socketClient, _f, sizeI);
+
+    fclose(_f);
 }
 
 void SharedLibClient::UPLOAD() {
-    char* command = (char*)Calloc(1024, sizeof(char));
-    char* status = (char*)Calloc(1024, sizeof(char));
+    // upload lato server
+    // download lato client
 
-#ifdef WIN32
-    sprintf_s(command, 1023, "UPLOAD %s;%llu", this->parametri.upload.src, this->parametri.upload.size);
-#else
-    snprintf(command, 1023, "UPLOAD %s;%llu", this->parametri.upload.src, this->parametri.upload.size);
+    if (std::filesystem::exists(this->parametri.upload.dest)) {
+        ShowErr("File destinazione già presente");
+    }
+
+    FILE* _f;
+
+    Fopen(&_f, this->parametri.upload.dest, "wb");
+
+    char status[4] = {0};
+
+    char* command = NULL;
+    int _commandLen = 0;
+
+    char* sizeCmd = NULL;
+    int _sizeCmdLen = 0;
+
+    char* size = NULL;
+    int _sizeLen = 0;
+
+    char* endP = NULL;
+
+    size_t sizeI;
+
+
+    // Invio SIZE per sapere la dimensione del file
+    _sizeCmdLen = Asprintf(sizeCmd, "SIZE %s", this->parametri.upload.src);
+    Send(this->socketClient, sizeCmd, _sizeCmdLen);
+    Free(sizeCmd, _sizeCmdLen);
+    // se percorso esiste allora 300
+    Recv(this->socketClient, status, 4);
+    if (strncmp(status, "300", 3) != 0) {
+        Free(status, 4);
+        printf("Errore da parte del server nell'eseguire SIZE\n");
+        return;
+    }
+
+    // ottengo il peso del file
+    size = (char*)Calloc(128, sizeof(char));
+    _sizeLen = Recv(this->socketClient, size, 128);
+
+    // peso del file in fomrato integer
+    sizeI = strtoull(size, &endP, 10);
+    Free(size, _sizeLen);
+#ifdef _DEBUG
+    printf("size recv: %llu", sizeI);
 #endif
+    ////////////////
 
-    this->Send_Recv(status, command);
+    _commandLen = Asprintf(command, "UPLOAD %s;%llu", this->parametri.upload.src, sizeI);
 
-    Free(command, strlen(command));
+    Send(this->socketClient, command, _commandLen);
+    Recv(this->socketClient, status, 4);
+
+    Free(command, _commandLen);
 
     if (strncmp(status, "300", 3) != 0) {
-        Free(status, 1024);
-
         printf("Errore nell'esecuzione di UPLOAD\n");
         return;
     }
-    Free(status, 1024);
 
 
+    RecvWriteF(this->socketClient, _f, sizeI);
 
-    char* ans = this->ReadAll();
-
-    printf("%s\n", ans);
-    Free(ans, strlen(ans));
+    fclose(_f);
 }
 
-char* SharedLibClient::ReadAll(){
-    char* buffer_recv = (char*)Calloc(1024, sizeof(char));
-    char* ans = (char*)Calloc(1, sizeof(char));
-    int x = 0;
-
-    while (true) {
-        this->Recv(buffer_recv);
-
-        if (strlen(buffer_recv) == 0) break;
-    
-    
-        if ((ans = (char*)realloc(ans, strlen(ans) + strlen(buffer_recv) +1 )) == NULL) {
-            ShowErr("Impossibile allocare memoria per il ReadAll");
-        }
-
-        memcpy(ans + strlen(ans), buffer_recv, strlen(buffer_recv)+1);
-        x++;
-  }
-
-  return ans;
-}
+///////////////////////////////////////
 
 void SharedLibClient::clearSocket() {
     // se instanziato, chiudi il socket
     if (this->socketClient != 0) {
-#ifdef WIN32
+#ifdef _WIN32
         shutdown(this->socketClient, SD_BOTH);
 #else
         shutdown(this->socketClient, SHUT_RDWR);
@@ -491,68 +522,4 @@ void SharedLibClient::clearSocket() {
 #ifdef _WIN32
     WSACleanup();
 #endif
-}
-
-
-// calloc Wrapper
-void* Calloc(unsigned long int count, unsigned long int size) {
-
-    if (count == 0 || size == 0) {
-        fprintf(stderr, "Uno dei due numeri del Calloc e' impostato a 0");
-        exit(1);
-        return NULL;
-    }
-
-    void* _t = calloc(count, size);
-    if (_t == 0) {
-        fprintf(stderr, "Impossibile allocare memoria");
-        exit(1);
-        return NULL;
-    }
-
-    return _t;
-}
-
-// fprintf Wrapper
-void ShowErr(const char* str) {
-    char t[1024];
-    #ifdef _WIN32
-        strerror_s(t, 1024, errno);
-    #else
-        strerror_r(errno, t, 1024);
-    #endif
-
-    printf("\n%s\n", t);
-    fprintf(stderr, "%s\n", str);
-    exit(1);
-    return;
-
-}
-
-// free Wrapper
-void Free(void* arg, int size) {
-
-    if (arg == NULL) {
-        fprintf(stderr, "variabile data a Free() � NULL\n");
-        exit(1);
-        return;
-    }
-
-    memset(arg, '\0', size);
-    free(arg);
-
-}
-
-// strcpy Wrapper
-void Strcpy(char* dest, unsigned int size, const char* src) {
-
-#ifdef _WIN32
-    strcpy_s(dest, size, src);
-    if (errno) {
-        ShowErr("Errore nel copiare una stringa");
-    }
-#else //linux
-    strncpy(dest, src, size);
-#endif
-
 }
