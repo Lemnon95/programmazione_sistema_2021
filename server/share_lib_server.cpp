@@ -824,8 +824,9 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
 }
 
 int LSF(SOCKET socket_descriptor, char* path) {
-    //TODO err
-    if (!std::filesystem::exists(path)){
+    std::error_code err;
+
+    if (!std::filesystem::exists(path, err)){
         Send(socket_descriptor, "400", 4);
         return 1;
     }
@@ -835,7 +836,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
     char* buffer = NULL;
     int _bufferLen = 0;
 
-    std::error_code err;
+    err.clear();
 
     for (auto& p : std::filesystem::directory_iterator(path, std::filesystem::directory_options::skip_permission_denied)) {
         buffer = NULL;
