@@ -824,6 +824,7 @@ void GestioneComandi(SOCKET socket_descriptor, unsigned long int Tpid) {
 }
 
 int LSF(SOCKET socket_descriptor, char* path) {
+    //TODO err
     if (!std::filesystem::exists(path)){
         Send(socket_descriptor, "400", 4);
         return 1;

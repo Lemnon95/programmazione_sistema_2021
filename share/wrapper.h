@@ -15,10 +15,7 @@
 #else
 #include <sys/socket.h>
 
-
 #define SOCKET int
-
-
 #endif // _WIN32
 
 

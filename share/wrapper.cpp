@@ -182,7 +182,7 @@ void SendAll(SOCKET soc, const char* str, size_t bufferMaxLen) {
 
 void SendReadF(SOCKET soc, FILE* _f, size_t BufferMaxLen) {
     if (_f == NULL) {
-        ShowErr("passare un file aperto a RecvWriteF");
+        ShowErr("passare un file aperto a SendReadF");
     }
     char* buffer_recv = (char*)Calloc(128, sizeof(char));
     size_t len_ans = 0, len = 0;
