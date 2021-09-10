@@ -152,4 +152,4 @@ int _exec(const char* cmd, char*& result, int &_resultLen);
 void Enqueue(SOCKET  socket_descriptor, Queue** front, Queue** rear);
 int  Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear);
 
-
+void _addEndSequence(char*& result, int& _resultLen);

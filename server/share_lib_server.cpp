@@ -578,19 +578,10 @@ void* SigHandler(void* dummy) {
 #else
 BOOL WINAPI CtrlHandler(DWORD signal) {
 
-    switch (signal) {
-    case CTRL_CLOSE_EVENT:
-    case CTRL_LOGOFF_EVENT:
-    case CTRL_SHUTDOWN_EVENT:
-    case CTRL_C_EVENT:
-        signum = 2;
-        CloseServer();
-        return TRUE;
-    default:
-        break;
-    }
+    signum = 2;
+    CloseServer();
+    return TRUE;
 
-    return FALSE;
 }
 #endif
 
@@ -898,6 +889,8 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
     char* fin = NULL;
     command = strtok_r(cmd, " ", &fin);
 
+    // l'if diventa falso se almeno uno dei comandi è 0 (uguale)
+    // l'if diventa true se command è diverso da tutte le stringhe
     if (strcmp(command, "copy") &&
         strcmp(command, "remove") &&
         strcmp(command, "whoami") &&
@@ -917,7 +910,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         int i = 0;
         char* _t = NULL;
         char** list = (char**)Calloc(1, sizeof(char*)); // lista di stringhe
-
+        std::error_code err;
         result = (char*)Calloc(1, sizeof(char));
         int _resultLen = 1;
 
@@ -943,36 +936,55 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         }
 
         // copy path1 path2 path3
-        if (i > 2 && !std::filesystem::is_directory(list[i-1])) {
-            for (int k = 0; k < i; k++) {
-                Free(list[k]);
+        if (i > 2 ) {
+
+            // copy dir1 path2 dir3
+            // caso particolare, abbiamo sia cartelle che file come argomento
+            for (int j = 0; j < i - 1; j++) {
+                // cerco se c'è una cartella tra gli argomenti, 
+                // se c'è allora l'ultimo file deve essere una cartella
+                if (std::filesystem::is_directory(list[j])) {
+                    // controllo se l'ultimo elemento esiste
+                    // se esiste (successivamente verrà fatto il controllo se è una cartella)
+                    // se non esiste crea una cartella con quel nome
+                    if (!std::filesystem::exists(list[i - 1])) {
+                        std::filesystem::create_directory(list[i - 1], err);
+                    }
+                    
+                    break;
+                }
             }
-            Free(list);
-            Send(socket_descriptor, "400", 4);
-            return 1;
+
+            if (!std::filesystem::is_directory(list[i - 1])) {
+                for (int k = 0; k < i; k++) {
+                    Free(list[k]);
+                }
+                Free(list);
+                Send(socket_descriptor, "400", 4);
+                return 1;
+            }
         }
 
-
-        std::error_code err;
-
+        err.clear();
         // copy path1 path2  ||  copy path1 path2 dir1
         for (int k = 0; k < i-1; k++) {
             if (std::filesystem::exists(list[k]) ){
                 // effettua la copia del file
-                std::filesystem::copy(list[k], list[i - 1], err);
+                std::filesystem::copy(list[k], list[i - 1], std::filesystem::copy_options::recursive, err);
                 if (err.value() != 0) {
                     // se la copia va male passa al successivo
                     Free(list[k], strlen(list[k]));
                     continue;
                 }
-                // il free alla fine riempie il buffer, ridichiaro il buffer
+                // il free alla fine rimuove il buffer, ridichiaro il buffer
                 char*buffer = NULL;
                 // componi la stringa
                 int _bufferLen = Asprintf(buffer, "%s\r\n", list[k]);
 
-                result = (char*)Realloc(result, (_resultLen + _bufferLen));
-
                 _resultLen += _bufferLen;
+
+                result = (char*)Realloc(result, _resultLen);
+
                 errno = 0;
                 #ifdef _WIN32
                 strcat_s(result, _resultLen, buffer);
@@ -988,16 +1000,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             }
         }
 
-        _resultLen += sizeof(" \r\n.\r\n");
-
-        result = (char*)Realloc(result, _resultLen);
-
-        #ifdef _WIN32
-        strcat_s(result, _resultLen, " \r\n.\r\n");
-        #else
-        strncat(result, " \r\n.\r\n", sizeof(" \r\n.\r\n"));
-        #endif
-
+        _addEndSequence(result, _resultLen);
 
         Send(socket_descriptor, "300", 4);
         SendAll(socket_descriptor, result, _resultLen);
@@ -1007,12 +1010,12 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
     }
 
     // remove
-    if (strcmp(command, "remove") == 0) {
+    else if (strcmp(command, "remove") == 0) {
         int i = 0;
         char* _t = NULL, *buffer = NULL;
         char** list = (char**)Calloc(1, sizeof(char*)); // lista di stringhe
         result = (char*)Calloc(1, sizeof(char));
-
+        int _resultLen = 1;
 
         while ((_t = strtok_r(NULL, " ", &fin)) != NULL) {
 
@@ -1042,19 +1045,17 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
                     continue;
                 }
 
-#ifdef _DEBUG
-                printf("error code remove %d", err.value());
-#endif // _DEBUG
-
-                // il free alla fine riempie il buffer, ridichiaro il buffer
+                // il free alla fine rimuove il buffer, ridichiaro il buffer
                 char* buffer = NULL;
                 int _bufferLen = Asprintf(buffer, "%s\r\n", list[k]);
 
-                result = (char*)Realloc(result, (strlen(result) + _bufferLen));
+                _resultLen += _bufferLen;
+
+                result = (char*)Realloc(result, _resultLen);
 
                 errno = 0;
                 #ifdef _WIN32
-                strcat_s(result, strlen(result) + _bufferLen, buffer);
+                strcat_s(result, _resultLen, buffer);
                 #else
                 strcat(result, buffer);
                 #endif
@@ -1068,16 +1069,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             }
         }
 
-        result = (char*)Realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
-        
-
-
-#ifdef _WIN32
-        strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
-#else
-        strcat(result, " \r\n.\r\n");
-#endif
-
+        _addEndSequence(result, _resultLen);
 
         Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result, strlen(result));
@@ -1085,7 +1077,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
     }
 
     // whoami
-    if (strcmp(command, "whoami") == 0) {
+    else if (strcmp(command, "whoami") == 0) {
 #ifdef _WIN32
         unsigned long size = UNLEN + 1;
         result = (char*)Calloc(size, sizeof(char));
@@ -1104,14 +1096,8 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         }
         strcat(result, user->pw_name);
 #endif
-
-        result = (char*)Realloc(result, strlen(result) + sizeof(" \r\n.\r\n"));
-        
-#ifdef _WIN32
-        strcat_s(result, strlen(result) + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
-#else
-        strcat(result, " \r\n.\r\n");
-#endif
+        int _resultLen = strlen(result)+1;
+        _addEndSequence(result, _resultLen);
 
         Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result, strlen(result));
@@ -1120,7 +1106,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
     }
 
     // printworkdir
-    if (strcmp(command, "printworkdir") == 0) {
+    else if (strcmp(command, "printworkdir") == 0) {
 
         std::error_code err;
 
@@ -1134,15 +1120,7 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             return 1;
         }
 
-        result = (char*)Realloc(result, _resultLen + sizeof(" \r\n.\r\n"));
-
-        #ifdef _WIN32
-        strcat_s(result, _resultLen + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
-        #else
-        strcat(result, " \r\n.\r\n");
-        #endif
-
-        _resultLen += sizeof(" \r\n.\r\n");
+        _addEndSequence(result, _resultLen);
 
         Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result, _resultLen);
@@ -1177,13 +1155,8 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
             result = NULL;
             _resultLen = Asprintf(result, "%d", code);
         }
-        result = (char*)Realloc(result, _resultLen+sizeof(" \r\n.\r\n"));
-#ifdef _WIN32
-        strcat_s(result, _resultLen + sizeof(" \r\n.\r\n"), " \r\n.\r\n");
-#else
-        strncat(result, " \r\n.\r\n", sizeof(" \r\n.\r\n"));
-#endif
-        _resultLen += sizeof(" \r\n.\r\n");
+
+        _addEndSequence(result, _resultLen);
 
         Send(socket_descriptor, "300",4);
         SendAll(socket_descriptor, result, strlen(result));
@@ -1315,6 +1288,7 @@ int _exec(const char* cmd, char*& result, int &_resultLen) {
     char buffer[128] = {0};
     result = (char*)Calloc(1, sizeof(char));
 
+    // silenzia qualsiasi errore generato dal sort
     try {
         while (fgets(buffer, sizeof(buffer)-1, pipe) != NULL) {
 
@@ -1333,9 +1307,9 @@ int _exec(const char* cmd, char*& result, int &_resultLen) {
     catch (...) {
         ;
     }
-    int i = pclose(pipe);
+     
 
-    return i;
+    return pclose(pipe);
 }
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -1381,4 +1355,16 @@ int Dequeue(SOCKET* socket_descriptor, Queue** front, Queue** rear) {
     size--;
     free(temp);
     return 0;
+}
+
+void _addEndSequence(char*& result, int& _resultLen) {
+    _resultLen += sizeof(" \r\n.\r\n");
+
+    result = (char*)Realloc(result, _resultLen);
+
+#ifdef _WIN32
+    strcat_s(result, _resultLen, " \r\n.\r\n");
+#else
+    strncat(result, " \r\n.\r\n", sizeof(" \r\n.\r\n"));
+#endif
 }
