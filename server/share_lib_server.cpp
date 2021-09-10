@@ -866,15 +866,7 @@ int LSF(SOCKET socket_descriptor, char* path) {
 
     }
 
-    _recordsLen += sizeof(" \r\n.\r\n");
-
-    records = (char*)Realloc(records, _recordsLen);
-
-    #ifdef _WIN32
-    strcat_s(records, _recordsLen, " \r\n.\r\n");
-    #else
-    strncat(records, " \r\n.\r\n", sizeof(" \r\n.\r\n"));
-    #endif
+    _addEndSequence(records, _recordsLen);
 
     SendAll(socket_descriptor, records, _recordsLen);
 
@@ -938,24 +930,19 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         // copy path1 path2 path3
         if (i > 2 ) {
 
-            // copy dir1 path2 dir3
-            // caso particolare, abbiamo sia cartelle che file come argomento
-            for (int j = 0; j < i - 1; j++) {
-                // cerco se c'è una cartella tra gli argomenti, 
-                // se c'è allora l'ultimo file deve essere una cartella
-                if (std::filesystem::is_directory(list[j])) {
-                    // controllo se l'ultimo elemento esiste
-                    // se esiste (successivamente verrà fatto il controllo se è una cartella)
-                    // se non esiste crea una cartella con quel nome
-                    if (!std::filesystem::exists(list[i - 1])) {
-                        std::filesystem::create_directory(list[i - 1], err);
+            if (!std::filesystem::exists(list[i - 1])) {
+                std::filesystem::create_directory(list[i - 1], err);
+                if (err.value() != 0) {
+                    for (int k = 0; k < i; k++) {
+                        Free(list[k]);
                     }
-                    
-                    break;
+                    Free(list);
+                    Send(socket_descriptor, "400", 4);
+                    return 1;
                 }
             }
-
-            if (!std::filesystem::is_directory(list[i - 1])) {
+            err.clear();
+            if (!std::filesystem::is_directory(list[i - 1],err)) {
                 for (int k = 0; k < i; k++) {
                     Free(list[k]);
                 }
@@ -1039,7 +1026,14 @@ int EXEC(SOCKET socket_descriptor, char* cmd) {
         // remove <...>
         for (int k = 0; k < i; k++) {
             if (std::filesystem::exists(list[k])) {
-                if (!std::filesystem::remove(list[k], err)) {
+
+                if (std::filesystem::is_directory(list[k], err)) {
+                    if (!std::filesystem::remove_all(list[k], err)) {
+                        Free(list[k]);
+                        continue;
+                    }
+                }
+                else if (!std::filesystem::remove(list[k], err)) {
                     // se la cancellazione fallisce passa al successivo
                     Free(list[k]);
                     continue;
@@ -1229,6 +1223,8 @@ int SIZE_(SOCKET socket_descriptor, char* path, bool end) {
     }
 
     _bufferLen = Asprintf(buffer, "%llu\r\n", size);
+
+
 
     Send(socket_descriptor, "300",4);
     Send(socket_descriptor, buffer, _bufferLen);
